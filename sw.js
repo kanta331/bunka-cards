@@ -1,12 +1,12 @@
 /* オフライン用。アプリ本体とデータは先に保存し、開くたびに裏で新しいものに入れ替える。
    中身を更新して公開するときは VERSION を上げる。 */
-var VERSION = 'v1';
-var CACHE = 'eitango-' + VERSION;
+var VERSION = 'v4';
+var CACHE = 'bunka-' + VERSION;
 var SHELL = [
   './',
   'index.html',
   'cards.json',
-  'words.json',
+  'aliases.json',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -20,7 +20,7 @@ self.addEventListener('install', function(e){
 self.addEventListener('activate', function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
-      return Promise.all(keys.filter(function(k){ return k.indexOf('eitango-')===0 && k!==CACHE; }).map(function(k){ return caches.delete(k); }));
+      return Promise.all(keys.filter(function(k){ return k.indexOf('bunka-')===0 && k!==CACHE; }).map(function(k){ return caches.delete(k); }));
     }).then(function(){ return self.clients.claim(); })
   );
 });
