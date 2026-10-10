@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="用語確認">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="figure.css">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -107,6 +108,16 @@ body{
   font-size:min(40px, calc(100cqw / (var(--w) + .3)));
 }
 .term.two{ font-size:min(30px, calc(100cqw / (var(--w) + .3))); }
+.cfig{ margin:-2px 0 0; }   /* 図示（承認済みのみ）。使いどころの下、つながりの上 */
+/* 図のある表面は詰める（図の枠の高さは固定なので、まわりを削る） */
+.front.hasfig{ padding-top:14px; gap:7px; }
+.front.hasfig .main{ gap:min(9px, 3cqw); }
+.front.hasfig .term{ font-size:min(34px, calc(100cqw / (var(--w) + .3))); }
+.front.hasfig .term.two{ font-size:min(26px, calc(100cqw / (var(--w) + .3))); }
+.front.hasfig .usage{ font-size:min(14px, 5.5cqw); line-height:1.65; padding-top:8px; }
+.front.hasfig .links > span{ display:none; }
+.front.hasfig .pills{ flex-wrap:nowrap; min-width:0; }
+.front.hasfig .pills span{ flex:0 1 auto; min-width:0; }
 .usage{ font-size:min(15.5px, 6.1cqw); line-height:1.85; color:var(--ink); border-top:1px solid var(--line); padding-top:12px; margin:0; }
 .links{ display:flex; flex-direction:column; gap:6px; }
 .links > span{ font-size:10.5px; color:var(--hint); letter-spacing:.1em; }
@@ -240,9 +251,22 @@ body{
 /* 記述練習 */
 #essay{ justify-content:flex-start; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 64px); }
 .es-q{ width:min(100%,380px); margin:10px 0 14px; text-align:center; line-height:1.5; }
-.es-q b{ display:block; font-family:var(--mincho); font-weight:600; font-size:clamp(22px, 7.5vw, 30px); text-wrap:balance; }
+.es-q b{ display:block; font-family:var(--mincho); font-weight:600; font-size:clamp(22px, 7.5vw, 30px); text-wrap:balance; word-break:keep-all; overflow-wrap:anywhere; }
 .es-q span{ font-size:14px; color:var(--onbg2); }
 .es-box{ width:min(100%,380px); display:flex; flex-direction:column; gap:8px; }
+/* 見ながら書く：ヒントとカード */
+.es-aid{ display:flex; gap:6px; justify-content:center; margin:-6px 0 10px; }
+.es-aid .link{ border:1px solid var(--line); border-radius:16px; padding:5px 14px; font-size:13px; color:var(--onbg); background:var(--face); }
+.es-aid .link[aria-expanded="true"]{ background:var(--frame); border-color:var(--frame); color:#fff; }
+.es-hint{ width:min(100%,380px); margin:0 0 12px; background:var(--face); color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.es-hint[hidden]{ display:none; }
+.es-hint i{ display:block; font-style:normal; font-size:11px; letter-spacing:.08em; color:var(--frame); margin-bottom:2px; }
+.es-hint p{ margin:0; font-size:14px; line-height:1.75; }
+.es-hint .fig2{ margin-top:2px; }
+.es-card{ position:fixed; inset:0; z-index:15; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(20,22,20,.6); }
+.es-card[hidden]{ display:none; }
+.es-card .x{ color:#f3eee2; }
+.es-card .hint{ color:#e6e0d2; }
 .es-box textarea{ width:100%; min-height:13em; resize:vertical; font:inherit; font-size:16px; line-height:1.75; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--face); color:var(--ink); }
 .es-box textarea:focus-visible{ outline:2px solid var(--frame); outline-offset:1px; }
 .es-box textarea[readonly]{ background:var(--face2); color:var(--muted); }
@@ -257,6 +281,7 @@ body{
 .es-msg{ font-size:13px; color:var(--onbg2); text-align:center; }
 .es-msg.err{ color:var(--red); }
 .es-end{ display:flex; gap:10px; justify-content:center; margin:20px 0 10px; }
+.es-end[hidden]{ display:none; }
 .home-foot{ position:absolute; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); left:0; right:0; text-align:center; }
 
 /* 開封 */
@@ -426,6 +451,11 @@ body{
   <button type="button" class="x" id="essayClose" aria-label="やめる">×</button>
   <div class="q-dir">記述</div>
   <div class="es-q" id="esQ"></div>
+  <div class="es-aid">
+    <button type="button" class="link" id="esHintBtn" aria-expanded="false" aria-controls="esHint">ヒントをみる</button>
+    <button type="button" class="link" id="esCardBtn">カードをみる</button>
+  </div>
+  <div class="es-hint" id="esHint" hidden></div>
   <div class="es-box">
     <textarea id="esText" placeholder="ここに書く" aria-label="答案"></textarea>
     <div class="es-meta"><span id="esCount">0 / 300字</span><button type="button" class="btn primary" id="esSend">送る</button></div>
@@ -436,6 +466,12 @@ body{
     <button type="button" class="btn primary" id="esHome">ホームへ</button>
   </div>
 </section>
+
+<div class="es-card" id="esCardShow" hidden>
+  <button type="button" class="x" id="esCardClose" aria-label="カードを閉じる">×</button>
+  <div class="stage" id="esCardStage"></div>
+  <div class="hint">タップで裏面　／　長押しで説明</div>
+</div>
 
 <section class="screen" id="quizEnd">
   <div class="q-end" id="qEndPts"></div>
@@ -454,6 +490,7 @@ body{
   </form>
 </dialog>
 
+<script src="figure.js"></script>
 <script>
 (function(){
   function esc(s){
@@ -547,10 +584,11 @@ body{
     }).join('');
     return ''
       +'<div class="card'+(kira ? ' kira' : '')+'" role="button" tabindex="0" aria-label="'+esc(c.term)+' のカード。タップで裏返す、長押しで説明">'
-      +  '<div class="face front">'
+      +  '<div class="face front'+(c.figure && c.figure.status==='approved' ? ' hasfig' : '')+'">'
       +    '<div class="meta">'+badge(c.exam)+(c.exam.note ? '<small>'+esc(c.exam.note)+'</small>' : '')+'</div>'
       +    '<div class="main">'+termHTML(c.term)
       +    '<p class="usage">'+esc(c.usage)+'</p></div>'
+      +    (c.figure && c.figure.status==='approved' && window.Figure ? '<div class="cfig">'+Figure.svg(c.figure)+'</div>' : '')
       +    '<div class="links"><span>つながり</span><div class="pills">'+pills+'</div></div>'
       +    '<div class="foot"><span>文化資源学　'+esc(c.exam.kind)+'</span><i>'+(kira ? '◆◆◆' : '◇◇◇')+'</i></div>'
       +    (kira ? '<div class="holo"></div>' : '')
@@ -1206,7 +1244,9 @@ body{
     (apiKey() ? Promise.resolve(true) : askKey()).then(function(ok){
       renderNet();
       if(!ok) return;
-      E={ c:APPROVED[Math.floor(Math.random()*APPROVED.length)], busy:false, done:false };
+      E={ c:APPROVED[Math.floor(Math.random()*APPROVED.length)], busy:false, done:false, aids:{ hint:false, card:false } };
+      $('esHint').hidden=true; $('esHint').innerHTML=''; $('esHintBtn').setAttribute('aria-expanded','false'); $('esHintBtn').textContent='ヒントをみる';
+      closeEssayCard();
       $('esQ').innerHTML='<b>'+esc(E.c.term)+'</b><span>について'+ESSAY_LEN+'字で説明せよ</span>';
       var ta=$('esText'); ta.value=''; ta.readOnly=false;
       $('esOut').innerHTML=''; $('esEnd').hidden=true; $('esSend').hidden=false;
@@ -1215,6 +1255,33 @@ body{
       ta.focus({preventScroll:true});
     });
   }
+  /* 見ながら書いて覚える：ヒント（使いどころ・つながり・図）と、カードそのもの（長押しで説明全文） */
+  $('esHintBtn').addEventListener('click', function(){
+    if(!E) return;
+    var box=$('esHint'), open=box.hidden;
+    if(open && !box.innerHTML){
+      var c=E.c;
+      box.innerHTML='<div><i>使いどころ</i><p>'+esc(c.usage)+'</p></div>'
+        +'<div><i>つながり</i><p>'+(c.links||[]).map(esc).join('、')+'</p></div>'
+        +(c.figure && c.figure.status==='approved' ? '<div>'+Figure.svg(c.figure)+'</div>' : '');
+    }
+    box.hidden=!open;
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+    this.textContent=open ? 'ヒントを閉じる' : 'ヒントをみる';
+    if(open) E.aids.hint=true;
+  });
+  $('esCardBtn').addEventListener('click', function(){
+    if(!E) return;
+    var o=S.owned[E.c.id];
+    mountCard($('esCardStage'), E.c, { kira:o && o.kira });
+    $('esCardShow').hidden=false;
+    E.aids.card=true;
+    $('esCardClose').focus({ preventScroll:true });
+  });
+  function closeEssayCard(){ $('esCardShow').hidden=true; $('esCardStage').innerHTML=''; }
+  $('esCardClose').addEventListener('click', closeEssayCard);
+  $('esCardShow').addEventListener('click', function(e){ if(e.target===this) closeEssayCard(); });
+
   function countEssay(){
     var n=essayLen($('esText').value), el=$('esCount');
     el.textContent=n+' / '+ESSAY_LEN+'字';
@@ -1270,7 +1337,7 @@ body{
       if(!r){ r={ points:[{ aspect:'指摘', comment:text }], next:'' }; }
       renderReview(r);
       var log=loadEssays();
-      log.push({ id:c.id, term:c.term, at:Date.now(), answer:answer, points:r.points, next:r.next });
+      log.push({ id:c.id, term:c.term, at:Date.now(), answer:answer, points:r.points, next:r.next, aids:cur.aids });
       saveEssays(log);
       E.done=true; $('esSend').hidden=true; $('esEnd').hidden=false;
     }, function(err){
@@ -1284,10 +1351,10 @@ body{
   });
   $('essayBtn').addEventListener('click', startEssay);
   $('esNext').addEventListener('click', startEssay);
-  $('esHome').addEventListener('click', function(){ E=null; show('home'); });
+  $('esHome').addEventListener('click', function(){ E=null; closeEssayCard(); show('home'); });
   $('essayClose').addEventListener('click', function(){
     if(E && !E.done && essayLen($('esText').value) && !confirm('書いた答案を捨ててホームへ戻ります')) return;
-    E=null; show('home');
+    E=null; closeEssayCard(); show('home');
   });
   $('quizClose').addEventListener('click', function(){ Q=null; $('qShow').classList.remove('on'); show('home'); });
   $('quizEndHome').addEventListener('click', function(){ show('home'); });

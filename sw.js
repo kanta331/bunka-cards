@@ -1,12 +1,14 @@
 /* オフライン用。アプリ本体とデータは先に保存し、開くたびに裏で新しいものに入れ替える。
    中身を更新して公開するときは VERSION を上げる。 */
-var VERSION = 'v6';
+var VERSION = 'v8';
 var CACHE = 'bunka-' + VERSION;
 var SHELL = [
   './',
   'index.html',
   'cards.json',
   'aliases.json',
+  'figure.js',
+  'figure.css',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

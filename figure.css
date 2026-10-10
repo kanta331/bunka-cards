@@ -1,0 +1,61 @@
+/* 図示（D-figure）の見た目。figure.js が作る SVG 用。表面と review.html で共有 */
+.fig2{ display:block; width:100%; height:auto; overflow:visible; }
+
+/* 年表 */
+.fig-timeline .tl-axis{ stroke:#bdb39f; stroke-width:1.5; stroke-linecap:round; }
+.fig-timeline .tl-dot{ fill:#2f5f9e; stroke:#f8f4ea; stroke-width:2; }
+.fig-timeline .tl-year{ fill:#1d1b16; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:.01em; }
+.fig-timeline .tl-lab{ fill:#6c675c; }
+/* 説明文で確かめられない年（verified:false）は白抜きと橙 */
+.fig-timeline .unv .tl-dot{ fill:#f8f4ea; stroke:#d0782b; stroke-width:2; stroke-dasharray:3 2; }
+.fig-timeline .unv .tl-year, .fig-timeline .unv .tl-lab{ fill:#b25e18; }
+
+/* 動き（型ごとに1つ）：年表は軸が左から伸び、出来事が古い順に現れる。表示のたび1回だけ */
+@media (prefers-reduced-motion:no-preference){
+  .fig-timeline .tl-axis{ transform-box:fill-box; transform-origin:0 50%; animation:tl-axis .7s cubic-bezier(.2,.7,.2,1) both; }
+  .fig-timeline .tl-ev{ animation:tl-ev .45s ease-out both; animation-delay:calc(.35s + var(--i)*.18s); }
+}
+@keyframes tl-axis{ from{ transform:scaleX(0) } to{ transform:scaleX(1) } }
+@keyframes tl-ev{ from{ opacity:0; transform:translateY(4px) } to{ opacity:1; transform:none } }
+
+/* ---------- 概念図 ---------- */
+.fig-diagram{ color:#6c675c; }
+.fig-diagram text{ font-size:14px; fill:#1d1b16; }
+.fig-diagram .note{ font-size:13px; fill:#6c675c; }
+.fig-diagram .nd.sh-box rect{ fill:#e8eef7; stroke:#2f5f9e; stroke-width:1.4; }
+.fig-diagram .nd.sh-circle ellipse{ fill:#f6ecd2; stroke:#c89b3c; stroke-width:1.4; }
+.fig-diagram .nd.sh-wall rect{ fill:#e2d9c8; stroke:#8c8170; stroke-width:2.4; }
+.fig-diagram .nd.sh-person .ic{ fill:#f8f4ea; stroke:#1d1b16; stroke-width:1.5; }
+.fig-diagram .nd.outer rect{ fill:none; stroke:#2f5f9e; stroke-width:1.4; stroke-dasharray:5 3; }
+.fig-diagram .nd.outer.sh-circle rect{ stroke:#c89b3c; }
+.fig-diagram .nd.outer text{ font-size:13px; fill:#1f4273; font-weight:600; }
+.fig-diagram .nd.band rect{ fill:#e8eef7; stroke:#2f5f9e; stroke-width:1.2; }
+.fig-diagram .nd.band.sh-circle rect{ fill:#f6ecd2; stroke:#c89b3c; }
+.fig-diagram .nd.band.sh-wall rect{ fill:#e2d9c8; stroke:#8c8170; }
+.fig-diagram .eg{ fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; }
+.fig-diagram .divider{ stroke:#bdb39f; stroke-width:1.5; stroke-dasharray:4 4; }
+.fig-diagram .beam{ stroke:#6c675c; stroke-width:3; stroke-linecap:round; }
+.fig-diagram .fulc{ fill:#bdb39f; }
+.fig-diagram .str{ stroke:#9a9384; stroke-width:1.2; }
+/* 説明文で確かめられないノード（verified:false）は橙の点線 */
+.fig-diagram .nd.unv rect, .fig-diagram .nd.unv ellipse{ stroke:#d0782b; stroke-dasharray:3 2; }
+.fig-diagram .nd.unv text{ fill:#b25e18; }
+
+/* 動き（型ごとに1つ・表示のたび1回だけ） */
+@media (prefers-reduced-motion:no-preference){
+  /* flow・hub・mediate・cycle：線が順に伸びる（cycle は一周する） */
+  .pt-flow .eg, .pt-hub .eg, .pt-mediate .eg, .pt-cycle .eg{ stroke-dasharray:1; stroke-dashoffset:1; animation:fg-draw .55s ease-out forwards; animation-delay:calc(.3s + var(--i)*.35s); }
+  .pt-cycle .eg{ animation-duration:.45s; animation-delay:calc(.3s + var(--i)*.45s); }
+  /* contrast：左、右の順に現れる */
+  .pt-contrast .nd{ animation:fg-in .5s ease-out both; animation-delay:calc(.15s + var(--i)*.5s); }
+  /* contain：中の箱が外箱へ落ちる */
+  .pt-contain .nd:not(.outer){ animation:fg-drop .5s cubic-bezier(.3,.6,.3,1) both; animation-delay:calc(.2s + var(--i)*.18s); }
+  /* layer：上の層から順に現れる */
+  .pt-layer .nd{ animation:fg-in .45s ease-out both; animation-delay:calc(.1s + var(--i)*.28s); }
+  /* balance：天秤が傾いて、つり合いに戻る */
+  .pt-balance .bal, .pt-balance .bal-pans{ transform-origin:190px 43px; animation:fg-tilt 1.8s ease-in-out .3s both; }
+}
+@keyframes fg-draw{ to{ stroke-dashoffset:0 } }
+@keyframes fg-in{ from{ opacity:0; transform:translateY(3px) } to{ opacity:1; transform:none } }
+@keyframes fg-drop{ from{ opacity:0; transform:translateY(-14px) } to{ opacity:1; transform:none } }
+@keyframes fg-tilt{ 0%{ transform:rotate(0) } 30%{ transform:rotate(-6deg) } 60%{ transform:rotate(4deg) } 85%{ transform:rotate(-1.5deg) } 100%{ transform:rotate(0) } }
