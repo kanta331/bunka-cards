@@ -1,6 +1,6 @@
 /* オフライン用。アプリ本体とデータは先に保存し、開くたびに裏で新しいものに入れ替える。
    中身を更新して公開するときは VERSION を上げる。 */
-var VERSION = 'v4';
+var VERSION = 'v5';
 var CACHE = 'bunka-' + VERSION;
 var SHELL = [
   './',
@@ -30,6 +30,8 @@ self.addEventListener('fetch', function(e){
   var req = e.request;
   if(req.method !== 'GET') return;
   var url = new URL(req.url);
+  /* Claude の API は保存しない（network only）。古い答えを返さないため */
+  if(url.hostname === 'api.anthropic.com') return;
   var same = url.origin === self.location.origin;
   var font = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if(!same && !font) return;
