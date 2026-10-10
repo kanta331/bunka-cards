@@ -1,6 +1,6 @@
 /* オフライン用。アプリ本体とデータは先に保存し、開くたびに裏で新しいものに入れ替える。
    中身を更新して公開するときは VERSION を上げる。 */
-var VERSION = 'v5';
+var VERSION = 'v6';
 var CACHE = 'bunka-' + VERSION;
 var SHELL = [
   './',
@@ -14,7 +14,13 @@ var SHELL = [
 ];
 
 self.addEventListener('install', function(e){
-  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(SHELL); }).then(function(){ return self.skipWaiting(); }));
+  /* 写真（photos/）は cards.json に載っている分をインストール時にまとめて取る */
+  e.waitUntil(caches.open(CACHE).then(function(c){
+    return c.addAll(SHELL).then(function(){ return c.match('cards.json'); }).then(function(r){ return r.json(); }).then(function(cards){
+      var files = cards.filter(function(x){ return x.photo && x.photo.file; }).map(function(x){ return encodeURI(x.photo.file); });
+      return c.addAll(files);
+    });
+  }).then(function(){ return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function(e){

@@ -66,6 +66,13 @@ def main():
                 cards.append(card)
                 originals[card["id"]] = body
 
+    # 写真（C-photo）は docx にないので、いまの cards.json から引き継ぐ
+    if OUT.exists():
+        prev = {c["id"]: c for c in json.loads(OUT.read_text(encoding="utf-8"))}
+        for c in cards:
+            if prev.get(c["id"], {}).get("photo"):
+                c["photo"] = prev[c["id"]]["photo"]
+
     aliases = json.loads(ALIASES.read_text(encoding="utf-8"))
     ids = {c["id"] for c in cards}
 
