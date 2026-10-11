@@ -160,6 +160,9 @@ body{
 .chat-log{ display:flex; flex-direction:column; gap:10px; margin-bottom:10px; }
 .chat-log:empty{ display:none; }
 .chat-hint{ font-size:11.5px; color:var(--hint); text-align:center; margin:-2px 0 8px; }
+.chat-tools{ display:flex; justify-content:flex-end; margin:-4px 0 6px; }
+.chat-tools[hidden]{ display:none; }
+.etym .chat .chat-tools button{ background:none; border:0; color:var(--hint); font-size:11.5px; padding:2px 4px; text-decoration:underline; text-underline-offset:2px; }
 .msg{ display:flex; align-items:flex-end; gap:7px; }
 .msg.k{ flex-direction:row-reverse; }
 .msg .av{ flex:none; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; background:#fff; }
@@ -294,7 +297,10 @@ body{
 .cz-exp .it p{ margin:4px 0 0; }
 .cz-exp .it b{ background:#fff3c4; font-weight:600; padding:0 2px; }
 .cz-exp .it small{ display:block; font-size:11.5px; color:var(--muted); margin-top:4px; }
-.cz-exp .ai{ align-self:center; }
+.cz-chat-h{ font-size:12.5px; color:var(--onbg2); text-align:center; margin-top:4px; }
+.cz-exp .chat{ margin:0; }
+.cz-exp .chat button{ flex:none; font-size:13px; padding:8px 14px; background:#2e9d5a; border-color:#2e9d5a; color:#fff; }
+.cz-exp .chat.nokey form button, .cz-exp .chat form button:disabled{ color:var(--hint); background:var(--face2); border-color:var(--line); border-style:dashed; }
 .cz-exp .ai-out{ background:var(--face); color:var(--ink); border-left:3px solid var(--frame); border-radius:8px; padding:10px 14px; font-size:14px; line-height:1.8; white-space:pre-wrap; }
 .cz-exp .ai-out:empty{ display:none; }
 .cz-exp .ai-out.wait{ color:var(--hint); }
@@ -506,6 +512,7 @@ body{
   <div class="save know">
     <button type="button" class="btn" id="knowBtn">浜通りの知識を読み込む</button>
     <button type="button" class="btn" id="forgetKnowBtn">知識を消す</button>
+    <button type="button" class="btn" id="forgetChatsBtn">会話をすべて消す</button>
     <input type="file" id="knowFile" accept=".md,.txt,text/plain,text/markdown" hidden>
   </div>
   <p class="know-note" id="knowNote"></p>
@@ -708,8 +715,7 @@ body{
       +'<h1'+(termWidth(c.term)>9 ? ' class="l"' : '')+'>'+esc(c.term)+'</h1>'
       +photoHTML(c.photo)
       +'<p>'+esc(c.body)+'</p>'
-      +'<div class="chat'+(apiKey() ? '' : ' nokey')+'"><div class="chat-log" aria-live="polite"></div>'
-      +'<form><input type="text" maxlength="200" enterkeyhint="send" placeholder="KANTAくんとして先生に聞く" aria-label="Claude先生に聞く"><button type="submit">送信</button></form></div>'
+      +chatBoxHTML()
       +'<div class="src"><button type="button" class="close">カードに戻る</button></div>';
   }
 
@@ -775,15 +781,12 @@ body{
     var off=!online(), eb=$('essayBtn');
     eb.disabled=off; eb.textContent=off ? '記述　圏外' : '記述';
     eb.classList.toggle('nokey', off || !apiKey());
-    var box=etym.querySelector('.chat');
-    if(box){
-      var b=box.querySelector('button');
+    document.querySelectorAll('.chat').forEach(function(box){
+      var b=box.querySelector('form button');
       b.disabled=off || !!box.dataset.busy; b.textContent=off ? '圏外' : '送信';
       box.classList.toggle('nokey', off || !apiKey());
-    }
+    });
     if($('esSend')) countEssay();
-    var za=document.getElementById('czAsk');
-    if(za && !za.dataset.busy){ za.disabled=off; za.textContent=off ? '圏外' : 'Claude でくわしく'; za.classList.toggle('nokey', off || !apiKey()); }
   }
   window.addEventListener('online', renderNet);
   window.addEventListener('offline', renderNet);
@@ -860,10 +863,46 @@ body{
     return '<div class="msg '+who+(extra ? ' '+extra : '')+'"><span class="av" aria-hidden="true">'+(who==='k' ? 'K' : '先')+'</span>'
       +'<div class="bub"><span class="who">'+(who==='k' ? 'KANTAくん' : 'Claude先生')+'</span><p>'+esc(text)+'</p></div></div>';
   }
-  function bindChat(box, c){
-    var form=box.querySelector('form'), input=box.querySelector('input'), btn=box.querySelector('button'), log=box.querySelector('.chat-log');
-    var seed=DIALOGS[c.id]||[], msgs=seed.map(function(m){ return { role:m.who==='k' ? 'user' : 'assistant', content:m.text }; });
-    log.innerHTML=seed.map(function(m){ return bubble(m.who, m.text); }).join('');
+  /* 会話はカードごとに残す（bunka:chats）。文書の掛け合いは dialogues.json にあるので、残すのは自分で聞いた分だけ。
+     書き出しに含め、読み込みで戻す。アプリの版を上げても消えない */
+  var CHATS='bunka:chats', CHAT_KEEP=200, CHAT_SEND=16;
+  function loadChats(){ try{ var o=JSON.parse(localStorage.getItem(CHATS)); return o && typeof o==='object' && !Array.isArray(o) ? o : {}; }catch(e){ return {}; } }
+  function saveChats(o){ try{ localStorage.setItem(CHATS, JSON.stringify(o)); }catch(e){} }
+  /* 直近 CHAT_SEND 件を送る。会話は必ず KANTAくん（user）から始まる決まりなので、先頭が先生なら1件落とす。
+     送り直すたびに同じになる部分（新しい質問の1つ前まで）にキャッシュの印を付ける */
+  function chatPayload(msgs){
+    var m=msgs.slice(-CHAT_SEND);
+    if(m.length && m[0].role!=='user') m=m.slice(1);
+    return m.map(function(x, i){
+      return i===m.length-2 ? { role:x.role, content:[{ type:'text', text:x.content, cache_control:{ type:'ephemeral' } }] } : { role:x.role, content:x.content };
+    });
+  }
+  function chatBoxHTML(){
+    return '<div class="chat'+(apiKey() ? '' : ' nokey')+'"><div class="chat-log" aria-live="polite"></div>'
+      +'<div class="chat-tools" hidden><button type="button" class="chat-clear">この会話を消す</button></div>'
+      +'<form><input type="text" maxlength="200" enterkeyhint="send" placeholder="KANTAくんとして先生に聞く" aria-label="Claude先生に聞く"><button type="submit">送信</button></form></div>';
+  }
+  /* o（省略可）：seed 最初に出す会話（既定は文書の掛け合い）／save 会話を残すか（既定は残す）／
+     extra 先生に添える前提（語のカードのあとに置く）／draft 入力欄に入れておく下書き */
+  function bindChat(box, c, o){
+    o=o||{};
+    var keep=o.save!==false;
+    var form=box.querySelector('form'), input=box.querySelector('input'), btn=form.querySelector('button'), log=box.querySelector('.chat-log');
+    var tools=box.querySelector('.chat-tools'), seed=o.seed || DIALOGS[c.id] || [], saved=keep ? (loadChats()[c.id]||[]) : [], msgs;
+    if(o.draft) input.value=o.draft;
+    function render(){
+      msgs=seed.map(function(m){ return { role:m.who==='k' ? 'user' : 'assistant', content:m.text }; })
+        .concat(saved.map(function(m){ return { role:m.role, content:m.content }; }));
+      log.innerHTML=seed.map(function(m){ return bubble(m.who, m.text); }).join('')
+        +saved.map(function(m){ return bubble(m.role==='user' ? 'k' : 't', m.content); }).join('');
+      tools.hidden=!keep || !saved.length;
+    }
+    render();
+    box.querySelector('.chat-clear').addEventListener('click', function(){
+      if(busy || !confirm('《'+c.term+'》の会話を消します（文書の掛け合いは残ります）')) return;
+      var all=loadChats(); delete all[c.id]; saveChats(all);
+      saved=[]; render();
+    });
     var busy=false;
     function add(html){
       log.insertAdjacentHTML('beforeend', html);
@@ -884,15 +923,21 @@ body{
         var typing=add(bubble('t', '…', 'typing'));
         /* 変わらない部分（先生の決まり＋浜通りの知識）を先に置き、キャッシュの印を付ける。
            語ごとに変わる部分（手本・用語カード）はその後ろ。知識が長いので、続けて聞くときの料金を抑えるため */
-        var know=knowledge(), tail='\n【話し方の手本（別の語の掛け合い）】\n'+sampleDialogs(c.id)+'\n\n【用語カード】\n'+cardContext(c);
+        var know=knowledge(), tail='\n【話し方の手本（別の語の掛け合い）】\n'+sampleDialogs(c.id)+'\n\n【用語カード】\n'+cardContext(c)+(o.extra||'');
         var system=know
           ? [{ type:'text', text:SENSEI+HAMADORI+'\n【浜通りの知識】\n'+know, cache_control:{ type:'ephemeral' } }, { type:'text', text:tail }]
           : SENSEI+tail;
-        callClaude(system, msgs.slice(-16)).then(function(text){
+        callClaude(system, chatPayload(msgs)).then(function(text){
           typing.remove();
           text=text || '（答えが空でした）';
           msgs.push({ role:'assistant', content:text });
           add(bubble('t', text, 'new'));
+          /* 答えが返った問いと答えの組だけ残す（残さない会話ではここで終わり） */
+          if(!keep) return;
+          var now=Date.now(), all=loadChats();
+          saved=saved.concat([{ role:'user', content:q, at:now }, { role:'assistant', content:text, at:now }]).slice(-CHAT_KEEP);
+          all[c.id]=saved; saveChats(all);
+          tools.hidden=false;
         }, function(err){
           typing.remove();
           msgs.pop();   /* 答えられなかった質問は会話に残さない（次に送るときの順番が崩れないように） */
@@ -1283,7 +1328,7 @@ body{
 
   /* 保存：JSON の書き出し／読み込み */
   $('exportBtn').addEventListener('click', function(){
-    var blob=new Blob([JSON.stringify(Object.assign({}, S, { essays:loadEssays() }), null, 1)], { type:'application/json' });
+    var blob=new Blob([JSON.stringify(Object.assign({}, S, { essays:loadEssays(), chats:loadChats() }), null, 1)], { type:'application/json' });
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='bunka-'+dayKey().replace(/-/g,'')+'.json';
     document.body.appendChild(a); a.click(); a.remove();
@@ -1294,6 +1339,7 @@ body{
     $('forgetKeyBtn').disabled=!apiKey();
     var k=knowledge();
     $('forgetKnowBtn').disabled=!k;
+    $('forgetChatsBtn').disabled=!Object.keys(loadChats()).length;
     $('knowBtn').textContent=k ? '浜通りの知識を読み込み直す' : '浜通りの知識を読み込む';
     $('knowNote').textContent=k ? '浜通りの知識：この端末に保存済み（'+Array.from(k).length.toLocaleString()+'字）。Claude先生に「浜通りと繋げると？」と聞けます。書き出しには含めません'
       : '浜通りの知識は未読み込み。読み込んだファイルはこの端末にだけ保存し、書き出しには含めません';
@@ -1309,6 +1355,12 @@ body{
       try{ localStorage.setItem(KNOW, t); }catch(e){ alert('この端末に保存できませんでした'); return; }
       renderForgetKey();
     });
+  });
+  $('forgetChatsBtn').addEventListener('click', function(){
+    var n=Object.keys(loadChats()).length;
+    if(!n || !confirm(n+'語ぶんの Claude先生との会話をすべて消します（文書の掛け合いは残ります）')) return;
+    try{ localStorage.removeItem(CHATS); }catch(e){}
+    renderForgetKey();
   });
   $('forgetKnowBtn').addEventListener('click', function(){
     if(!confirm('この端末に保存した浜通りの知識を消します')) return;
@@ -1328,6 +1380,8 @@ body{
       if(!valid(s)){ alert('このファイルは読み込めません'); return; }
       if(!confirm('いまの記録をこのファイルの内容で置き換えます')) return;
       if(Array.isArray(s.essays)) saveEssays(s.essays);
+      if(s.chats && typeof s.chats==='object' && !Array.isArray(s.chats)) saveChats(s.chats);
+      delete s.chats;
       delete s.essays;
       S=s; save(); renderCollection();
     });
@@ -1539,7 +1593,11 @@ body{
       /* 新しく手に入れたときは、光り終わったところでカードを表に返して見せる */
       if(isNew){ var cur=CZ; setTimeout(function(){ if(CZ===cur && current==='cloze') showGotCard(c, true); }, 120+5*160+500); }
     }else{
-      $('czMsg').textContent='誤答 '+wrong.length+'つ　ポイントなし';
+      /* 誤答のときもカードは見られる（手には入らない。所持・会った回数は変えない） */
+      var cw=CZ.c;
+      $('czMsg').innerHTML='誤答 '+wrong.length+'つ　ポイントなし'
+        +'<div class="cz-get"><button type="button" class="btn" id="czSeeCard">カードを見る</button></div>';
+      $('czSeeCard').addEventListener('click', function(){ showGotCard(cw, false); });
       explain(wrong);
     }
     $('czEnd').hidden=false;
@@ -1590,42 +1648,22 @@ body{
       }
       html+='</div>';
     });
-    html+='<button type="button" class="btn ai" id="czAsk">Claude でくわしく</button><div class="ai-out" id="czAskOut" aria-live="polite"></div>';
+    html+='<div class="cz-chat-h">KANTAくんとして Claude先生に聞く</div>'+chatBoxHTML();
     $('czExp').innerHTML=html; $('czExp').hidden=false;
     CZ.wrong=wrong;
+    /* 先生には、問題のカードに加えて、誤答の語が出てくるカードとまちがえた穴の一覧を前提として渡す。会話は残さない */
+    var srcIds={};
+    wrong.forEach(function(w){ if(CZ.src[w.v]) srcIds[CZ.src[w.v]]=1; });
+    var extra='\n\n【穴埋め問題の結果】\n上の用語カードの説明文から5か所を穴にした問題で、KANTAくんは次の穴をまちがえた。'
+      +'なぜその語ではなく正解が入るのかを、文脈と語の意味から説明する。まちがいが複数あるときは「穴1は〜」のように穴ごとに触れてよく、その場合は全体で300字以内でよい。\n'
+      +wrong.map(function(w){ return holeNo(w.k)+'：入れた語「'+w.v+'」、正解「'+w.t+'」'; }).join('\n')
+      +Object.keys(srcIds).map(function(id){ return '\n\n【誤答の語が出てくるカード】\n'+cardContext(BYID[id]); }).join('');
+    var w0=wrong[0];
+    bindChat($('czExp').querySelector('.chat'), c, { seed:[], save:false, extra:extra,
+      draft:'先生、'+holeNo(w0.k)+'に「'+w0.v+'」を入れたんですけど、なんでちがうんですか'+(wrong.length>1 ? '？ほかの穴も' : '') });
     renderNet();
   }
 
-  /* 解説B：Claude に、誤答ごとに「なぜその語ではないか」を書かせる。カードの承認済みデータだけを前提にする */
-  $('czExp').addEventListener('click', function(e){
-    if(!e.target.closest('#czAsk') || !CZ || !CZ.wrong || !online()) return;
-    var btn=$('czAsk'), out=$('czAskOut'), cur=CZ;
-    (apiKey() ? Promise.resolve(true) : askKey()).then(function(ok){
-      renderNet();
-      if(!ok || cur!==CZ) return;
-      btn.disabled=true; btn.dataset.busy='1'; out.className='ai-out wait'; out.textContent='考え中…';
-      var srcIds={};
-      cur.wrong.forEach(function(w){ if(cur.src[w.v]) srcIds[cur.src[w.v]]=1; });
-      var system='あなたは東京大学大学院（文化資源学）の入試に向けて学ぶ人を手伝う。'
-        +'穴埋め問題で、学習者が穴に入れた語のうちまちがえたものについて、なぜその語ではなく正解の語が入るのかを、誤答ごとに日本語で短く説明する。'
-        +'全体で350字以内。前置きや見出しは付けず、「穴1：」のように穴の番号から書き始める。'
-        +'下の用語カード（承認済み）の内容だけを根拠にし、カードにない事実を足さない。\n\n'
-        +'【問題のカード】\n'+cardContext(cur.c)
-        +Object.keys(srcIds).map(function(id){ return '\n\n【誤答の語が出てくるカード】\n'+cardContext(BYID[id]); }).join('');
-      var user='穴の空いた文章は【問題のカード】の説明文。まちがえた穴：\n'
-        +cur.wrong.map(function(w){ return holeNo(w.k)+'：入れた語「'+w.v+'」、正解「'+w.t+'」'; }).join('\n');
-      callClaude(system, user).then(function(text){
-        if(cur!==CZ) return;
-        out.className='ai-out'; out.textContent=text || '（答えが空でした）';
-      }, function(err){
-        if(cur!==CZ) return;
-        out.className='ai-out err';
-        out.textContent=err.status==='refusal' ? err.message : err.status===401 ? '鍵が正しくないようです。コレクション画面の「鍵を消す」から入れ直してください。'
-          : err.status ? 'うまく返りませんでした（'+err.status+'：'+err.message+'）' : '通信できませんでした';
-        delete btn.dataset.busy; btn.disabled=false;
-      });
-    });
-  });
   function clearSel(){
     document.querySelectorAll('#cloze .sel').forEach(function(x){ x.classList.remove('sel'); });
     if(CZ) CZ.sel=null;
