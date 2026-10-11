@@ -156,17 +156,29 @@ body{
 .ph figcaption{ margin-top:6px; font-size:12px; color:var(--muted); line-height:1.5; }
 .ph figcaption a{ display:block; margin-top:2px; font-size:10.5px; color:var(--hint); text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:2px; word-break:break-all; }
 /* この語について聞く（長押し面の下に小さく） */
-.ask{ margin:6px 0 22px; max-width:34em; }
-.ask form{ display:flex; gap:8px; align-items:center; }
-.ask input{ flex:1; min-width:0; font:inherit; font-size:16px; padding:8px 12px; border-radius:18px; border:1px solid var(--line); background:#fff; color:var(--ink); }
-.ask input:focus-visible{ outline:2px solid var(--frame); outline-offset:1px; }
-.etym .ask button{ flex:none; font-size:13px; padding:8px 14px; }
-.ask.nokey button{ color:var(--hint); background:var(--face2); border-style:dashed; }
-.ask-out{ margin-top:12px; font-size:14.5px; line-height:1.85; white-space:pre-wrap; }
-.ask-out:empty{ display:none; }
-.ask-out.wait{ color:var(--hint); }
-.ask-out.err{ color:var(--red); font-size:13px; }
-.ask-out:not(.wait):not(.err){ border-left:3px solid var(--frame); padding-left:12px; }
+.chat{ margin:4px 0 22px; max-width:34em; background:#eef1ea; border-radius:14px; padding:12px 10px 10px; }
+.chat-log{ display:flex; flex-direction:column; gap:10px; margin-bottom:10px; }
+.chat-log:empty{ display:none; }
+.chat-hint{ font-size:11.5px; color:var(--hint); text-align:center; margin:-2px 0 8px; }
+.msg{ display:flex; align-items:flex-end; gap:7px; }
+.msg.k{ flex-direction:row-reverse; }
+.msg .av{ flex:none; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; background:#fff; }
+.msg.t .av{ border:2px solid #9a9a9a; color:#6b6b6b; font-family:var(--mincho); }
+.msg.k .av{ border:2px solid #2e9d5a; color:#1f7a44; }
+.msg .who{ display:block; font-size:10.5px; color:var(--hint); margin:0 4px 2px; }
+.msg.k .who{ text-align:right; }
+.msg .bub{ max-width:78%; }
+.msg p{ margin:0; padding:8px 12px; border-radius:16px; font-size:14.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+.msg.t p{ background:#fff; color:var(--ink); border-bottom-left-radius:4px; }
+.msg.k p{ background:#a8e6a0; color:#14321b; border-bottom-right-radius:4px; }
+.msg.err p{ background:#fbe7e4; color:#7a1f17; font-size:13px; }
+.msg.typing p{ color:var(--hint); letter-spacing:.2em; }
+@media (prefers-reduced-motion:no-preference){ .msg.typing p{ animation:breathe 1.2s ease-in-out infinite; } .msg.new{ animation:fg-in .25s ease-out; } }
+.chat form{ display:flex; gap:8px; align-items:center; }
+.chat input{ flex:1; min-width:0; font:inherit; font-size:16px; padding:8px 14px; border-radius:20px; border:1px solid var(--line); background:#fff; color:var(--ink); }
+.chat input:focus-visible{ outline:2px solid #2e9d5a; outline-offset:1px; }
+.etym .chat button{ flex:none; font-size:13px; padding:8px 14px; background:#2e9d5a; border-color:#2e9d5a; color:#fff; }
+.chat.nokey button, .etym .chat button:disabled{ color:var(--hint); background:var(--face2); border-color:var(--line); border-style:dashed; }
 /* 鍵の入力 */
 .keydlg{ border:0; border-radius:16px; padding:22px 20px 18px; width:min(92vw,360px); background:var(--face); color:var(--ink); box-shadow:0 20px 50px -20px rgba(0,0,0,.6); }
 .keydlg::backdrop{ background:rgba(20,22,20,.55); }
@@ -315,10 +327,13 @@ body{
 .es-hint i{ display:block; font-style:normal; font-size:11px; letter-spacing:.08em; color:var(--frame); margin-bottom:2px; }
 .es-hint p{ margin:0; font-size:14px; line-height:1.75; }
 .es-hint .fig2{ margin-top:2px; }
-.es-card{ position:fixed; inset:0; z-index:15; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(20,22,20,.6); }
+.es-card{ position:fixed; inset:0; z-index:15; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(20,22,20,.86); }
 .es-card[hidden]{ display:none; }
 .es-card .x{ color:#f3eee2; }
 .es-card .hint{ color:#e6e0d2; }
+.es-card-cap{ color:#f6efd9; font-family:var(--mincho); font-weight:600; font-size:20px; margin-bottom:16px; min-height:1px; text-align:center; }
+.es-card-cap:empty{ display:none; }
+.cz-get{ margin-top:8px; }
 .es-box textarea{ width:100%; min-height:13em; resize:vertical; font:inherit; font-size:16px; line-height:1.75; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--face); color:var(--ink); }
 .es-box textarea:focus-visible{ outline:2px solid var(--frame); outline-offset:1px; }
 .es-box textarea[readonly]{ background:var(--face2); color:var(--muted); }
@@ -540,6 +555,7 @@ body{
 
 <div class="es-card" id="esCardShow" hidden>
   <button type="button" class="x" id="esCardClose" aria-label="カードを閉じる">×</button>
+  <div class="es-card-cap" id="esCardCap"></div>
   <div class="stage" id="esCardStage"></div>
   <div class="hint">タップで裏面　／　長押しで説明</div>
 </div>
@@ -684,7 +700,8 @@ body{
       +'<h1'+(termWidth(c.term)>9 ? ' class="l"' : '')+'>'+esc(c.term)+'</h1>'
       +photoHTML(c.photo)
       +'<p>'+esc(c.body)+'</p>'
-      +'<div class="ask'+(apiKey() ? '' : ' nokey')+'"><form><input type="text" maxlength="200" enterkeyhint="send" placeholder="この語について聞く" aria-label="この語について聞く"><button type="submit">聞く</button></form><div class="ask-out" aria-live="polite"></div></div>'
+      +'<div class="chat'+(apiKey() ? '' : ' nokey')+'"><div class="chat-log" aria-live="polite"></div>'
+      +'<form><input type="text" maxlength="200" enterkeyhint="send" placeholder="KANTAくんとして先生に聞く" aria-label="Claude先生に聞く"><button type="submit">送信</button></form></div>'
       +'<div class="src"><button type="button" class="close">カードに戻る</button></div>';
   }
 
@@ -695,7 +712,7 @@ body{
     etym.innerHTML=etymHTML(c);
     var closeBtn=etym.querySelector('.close');
     closeBtn.addEventListener('click', closeEtym);
-    bindAsk(etym.querySelector('.ask'), c);
+    bindChat(etym.querySelector('.chat'), c);
     renderNet();
     etymCard=card; etymDone=onClosed;
     etym.style.setProperty('--cx', x+'px'); etym.style.setProperty('--cy', y+'px');
@@ -712,7 +729,7 @@ body{
     card.classList.remove('burst');
     setTimeout(function(){ etym.classList.remove('hide'); if(done) done(); },520);
   }
-  etym.addEventListener('keydown', function(e){ if(e.key==='Escape' && !e.target.closest('.ask')) closeEtym(); });
+  etym.addEventListener('keydown', function(e){ if(e.key==='Escape' && !e.target.closest('.chat')) closeEtym(); });
 
   /* =====================================================
      Claude を直接呼ぶ（B-live）。鍵はこの端末の localStorage にだけ置く
@@ -750,10 +767,10 @@ body{
     var off=!online(), eb=$('essayBtn');
     eb.disabled=off; eb.textContent=off ? '記述　圏外' : '記述';
     eb.classList.toggle('nokey', off || !apiKey());
-    var box=etym.querySelector('.ask');
+    var box=etym.querySelector('.chat');
     if(box){
       var b=box.querySelector('button');
-      b.disabled=off || !!box.dataset.busy; b.textContent=off ? '圏外' : '聞く';
+      b.disabled=off || !!box.dataset.busy; b.textContent=off ? '圏外' : '送信';
       box.classList.toggle('nokey', off || !apiKey());
     }
     if($('esSend')) countEssay();
@@ -772,6 +789,7 @@ body{
       +'つながり：'+(c.links||[]).join('、');
   }
 
+  /* user は1つの文字列か、{role, content} の配列（会話） */
   function callClaude(system, user){
     return fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
@@ -783,7 +801,7 @@ body{
       },
       /* Sonnet 5.5 は指定しないと思考してから答え、その分も max_tokens に数えられて本文が途中で切れる。
          ツールを使わないので between_tools で思考を止め、800 を本文に回す */
-      body:JSON.stringify({ model:MODEL, max_tokens:800, thinking:{ type:'between_tools' }, system:system, messages:[{ role:'user', content:user }] })
+      body:JSON.stringify({ model:MODEL, max_tokens:800, thinking:{ type:'between_tools' }, system:system, messages:Array.isArray(user) ? user : [{ role:'user', content:user }] })
     }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(d){
         if(!r.ok){
@@ -797,10 +815,40 @@ body{
     });
   }
 
-  /* この語について聞く：1問1答。前の質問は引き継がない */
-  function bindAsk(box, c){
-    var form=box.querySelector('form'), input=box.querySelector('input'), btn=box.querySelector('button'), out=box.querySelector('.ask-out');
+  /* =====================================================
+     Claude先生に聞く（LINE 風）。右があなた＝KANTAくん、左が Claude先生。
+     掛け合いのある語（dialogues.json、原文のまま）はそれを最初の会話として出し、続けて聞ける。
+     先生は会話の流れを踏まえて答える。会話は残さない（長押し面を閉じたら消える）
+     ===================================================== */
+  var DIALOGS={};
+  var SENSEI='あなたは「Claude先生」。東京大学大学院（文化資源学）の入試に向けて学ぶ「KANTAくん」の質問に、LINE のチャットで答える。\n'
+    +'KANTAくんは用語を字面で誤解したり、身近な例に引き寄せたり、ちょっとボケたりする。\n'
+    +'答え方：\n'
+    +'・まず誤解があれば、やさしく正す（「〜ではありません」「逆です」）。\n'
+    +'・すぐ核心を短く言う。2〜3文、全体で150字以内。です・ます調。前置きや見出し、箇条書き、記号での強調は使わない。\n'
+    +'・年号や仕組み、具体例を一つ添えると覚えやすい。ボケには軽く乗ってから論点に戻す。\n'
+    +'・下の用語カード（承認済み）の内容を前提にする。カードにない事実は確かなものだけを述べ、不確かなときはそう言う。\n'
+    +'・入試の論述で使える観点（論点・使いどころ）につなげられるときはつなげる。\n';
+  function sampleDialogs(skip){
+    var ids=Object.keys(DIALOGS).filter(function(id){ return id!==skip; }).slice(0, 2);
+    return ids.map(function(id){
+      return '（'+id+'）\n'+DIALOGS[id].map(function(m){ return (m.who==='k' ? 'KANTAくん：' : 'Claude先生：')+m.text; }).join('\n');
+    }).join('\n\n');
+  }
+  function bubble(who, text, extra){
+    return '<div class="msg '+who+(extra ? ' '+extra : '')+'"><span class="av" aria-hidden="true">'+(who==='k' ? 'K' : '先')+'</span>'
+      +'<div class="bub"><span class="who">'+(who==='k' ? 'KANTAくん' : 'Claude先生')+'</span><p>'+esc(text)+'</p></div></div>';
+  }
+  function bindChat(box, c){
+    var form=box.querySelector('form'), input=box.querySelector('input'), btn=box.querySelector('button'), log=box.querySelector('.chat-log');
+    var seed=DIALOGS[c.id]||[], msgs=seed.map(function(m){ return { role:m.who==='k' ? 'user' : 'assistant', content:m.text }; });
+    log.innerHTML=seed.map(function(m){ return bubble(m.who, m.text); }).join('');
     var busy=false;
+    function add(html){
+      log.insertAdjacentHTML('beforeend', html);
+      var last=log.lastElementChild; if(last && last.scrollIntoView) last.scrollIntoView({ block:'nearest', behavior:'smooth' });
+      return last;
+    }
     form.addEventListener('submit', function(e){
       e.preventDefault();
       if(busy || !online()) return;
@@ -808,21 +856,23 @@ body{
       (apiKey() ? Promise.resolve(true) : askKey()).then(function(ok){
         box.classList.toggle('nokey', !apiKey());
         if(!ok || !q){ if(ok) input.focus(); return; }
-        busy=true; box.dataset.busy='1'; btn.disabled=true; input.disabled=true;
-        out.className='ask-out wait'; out.textContent='考え中…';
-        var system='あなたは東京大学大学院（文化資源学）の入試に向けて学ぶ人を手伝う。'
-          +'次の用語カード（承認済み）の内容を前提に、質問に日本語で答える。'
-          +'答えは200字以内。前置きや見出しは付けず、本文だけを書く。'
-          +'カードにない事実は確かなものだけを述べ、不確かなときはそう書く。\n\n'
-          +'【用語カード】\n'+cardContext(c);
-        callClaude(system, q).then(function(text){
-          out.className='ask-out'; out.textContent=text || '（答えが空でした）';
+        input.value='';
+        add(bubble('k', q, 'new'));
+        msgs.push({ role:'user', content:q });
+        busy=true; box.dataset.busy='1'; btn.disabled=true;
+        var typing=add(bubble('t', '…', 'typing'));
+        var system=SENSEI+'\n【話し方の手本（別の語の掛け合い）】\n'+sampleDialogs(c.id)+'\n\n【用語カード】\n'+cardContext(c);
+        callClaude(system, msgs.slice(-16)).then(function(text){
+          typing.remove();
+          text=text || '（答えが空でした）';
+          msgs.push({ role:'assistant', content:text });
+          add(bubble('t', text, 'new'));
         }, function(err){
-          out.className='ask-out err';
-          out.textContent=err.status==='refusal' ? err.message : err.status===401 ? '鍵が正しくないようです。コレクション画面の「鍵を消す」から入れ直してください。'
-            : err.status ? 'うまく答えが返りませんでした（'+err.status+'：'+err.message+'）'
-            : '通信できませんでした';
-        }).then(function(){ busy=false; delete box.dataset.busy; input.disabled=false; renderNet(); });
+          typing.remove();
+          msgs.pop();   /* 答えられなかった質問は会話に残さない（次に送るときの順番が崩れないように） */
+          add(bubble('t', err.status==='refusal' ? err.message : err.status===401 ? '鍵が正しくないようです。コレクション画面の「鍵を消す」から入れ直してください。'
+            : err.status ? 'うまく答えられませんでした（'+err.status+'：'+err.message+'）' : '通信できませんでした。もう一度送ってください', 'err'));
+        }).then(function(){ busy=false; delete box.dataset.busy; renderNet(); input.focus({ preventScroll:true }); });
       });
     });
   }
@@ -1422,18 +1472,45 @@ body{
     });
     $('czTray').hidden=true;
     if(!wrong.length){
+      /* 全問正解：2ポイントと、その語のカード。持っていなければ手に入る（「知ってる」と同じ扱いでキラなし）。
+         持っていれば会った回数が1つ増える */
+      var c=CZ.c, own=S.owned[c.id], isNew=!own;
+      if(isNew) S.owned[c.id]={ order:S.nextOrder++, first:Date.now(), met:1, kira:false };
+      else own.met++;
       S.points+=2; save();
-      $('czMsg').innerHTML='<div class="cz-done">全問正解</div>+2 ポイント';
+      $('czMsg').innerHTML='<div class="cz-done">全問正解</div>+2 ポイント'
+        +(isNew ? '　《'+esc(c.term)+'》のカードをゲット' : '　（持っているカード。会った '+own.met+'回）')
+        +'<div class="cz-get"><button type="button" class="btn" id="czSeeCard">カードを見る</button></div>';
+      $('czSeeCard').addEventListener('click', function(){ showGotCard(c, false); });
       var sp=$('czText').querySelector('.sparks');
       document.querySelectorAll('#czText .hole.ok').forEach(function(h, i){
         setTimeout(function(){ h.classList.add('glow'); for(var j=0;j<8;j++) spawnSpark(sp, 1); }, 120+i*160);
       });
+      /* 新しく手に入れたときは、光り終わったところでカードを表に返して見せる */
+      if(isNew){ var cur=CZ; setTimeout(function(){ if(CZ===cur && current==='cloze') showGotCard(c, true); }, 120+5*160+500); }
     }else{
       $('czMsg').textContent='誤答 '+wrong.length+'つ　ポイントなし';
       explain(wrong);
     }
     $('czEnd').hidden=false;
   });
+
+  /* 手に入れたカードを重ねて見せる。新しいときは裏から表へ返し、繋がりの数だけ火花を出す */
+  function showGotCard(c, reveal){
+    var o=S.owned[c.id], el=mountCard($('esCardStage'), c, { kira:o && o.kira, flipped:reveal, locked:reveal });
+    $('esCardCap').textContent=reveal ? 'カードをゲット' : '';
+    $('esCardShow').hidden=false;
+    if(reveal){
+      setTimeout(function(){
+        el.classList.remove('flipped');
+        var n=ownedNeighbors(c.id), sp=el.querySelector('.sparks');
+        for(var k=0;k<Math.max(1, n);k++) setTimeout(function(){ for(var i=0;i<10;i++) spawnSpark(sp, 1); }, 300+k*180);
+        if(n) setTimeout(function(){ el.querySelectorAll('.pills span.on').forEach(function(s){ s.classList.add('glow'); }); }, 350);
+        setTimeout(function(){ delete el.dataset.locked; }, 700);
+      }, 250);
+    }
+    $('esCardClose').focus({ preventScroll:true });
+  }
 
   /* 説明文を文に分け、位置 pos を含む文を返す */
   function sentenceAt(text, pos){
@@ -1559,9 +1636,9 @@ body{
   $('czText').addEventListener('click', holeTap);
   $('czText').addEventListener('keydown', holeTap);
   $('clozeBtn').addEventListener('click', startCloze);
-  $('czNext').addEventListener('click', startCloze);
-  $('czHome').addEventListener('click', function(){ CZ=null; show('home'); });
-  $('clozeClose').addEventListener('click', function(){ CZ=null; show('home'); });
+  $('czNext').addEventListener('click', function(){ closeEssayCard(); startCloze(); });
+  $('czHome').addEventListener('click', function(){ CZ=null; closeEssayCard(); show('home'); });
+  $('clozeClose').addEventListener('click', function(){ CZ=null; closeEssayCard(); show('home'); });
 
   /* =====================================================
      6. 記述練習：124語からランダムに1語、300字で説明 → 3観点の指摘と「次に足すなら」
@@ -1611,7 +1688,7 @@ body{
     E.aids.card=true;
     $('esCardClose').focus({ preventScroll:true });
   });
-  function closeEssayCard(){ $('esCardShow').hidden=true; $('esCardStage').innerHTML=''; }
+  function closeEssayCard(){ $('esCardShow').hidden=true; $('esCardStage').innerHTML=''; $('esCardCap').textContent=''; }
   $('esCardClose').addEventListener('click', closeEssayCard);
   $('esCardShow').addEventListener('click', function(e){ if(e.target===this) closeEssayCard(); });
 
@@ -1699,9 +1776,10 @@ body{
   Promise.all([
     fetch('cards.json').then(function(r){ return r.json(); }),
     fetch('aliases.json').then(function(r){ return r.json(); }),
-    fetch('cloze.json').then(function(r){ return r.json(); }).catch(function(){ return {}; })
+    fetch('cloze.json').then(function(r){ return r.json(); }).catch(function(){ return {}; }),
+    fetch('dialogues.json').then(function(r){ return r.json(); }).catch(function(){ return {}; })
   ]).then(function(res){
-    CARDS=res[0]; ALIASES=res[1]; CLOZE=res[2]||{};
+    CARDS=res[0]; ALIASES=res[1]; CLOZE=res[2]||{}; DIALOGS=res[3]||{};
     CARDS.forEach(function(c){ BYID[c.id]=c; });
     buildNeighbors();
     APPROVED=CARDS.filter(function(c){ return c.status==='approved'; });
