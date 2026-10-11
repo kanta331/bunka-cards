@@ -394,6 +394,8 @@ body{
 .empty{ color:var(--onbg2); font-size:14px; margin:40px 0; text-align:center; line-height:1.8; }
 .save{ display:flex; gap:10px; margin:30px 0 10px; flex-wrap:wrap; justify-content:center; }
 .save .btn{ font-size:13px; padding:9px 18px; }
+.save.know{ margin-top:0; }
+.know-note{ font-size:12px; color:var(--onbg2); text-align:center; margin:0 0 20px; line-height:1.6; max-width:24em; }
 
 /* キラ加工：知らなかった語 */
 .holo{ position:absolute; inset:0; pointer-events:none; z-index:1; mix-blend-mode:multiply; opacity:.55;
@@ -501,6 +503,12 @@ body{
     <button type="button" class="btn" id="forgetKeyBtn">鍵を消す</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
+  <div class="save know">
+    <button type="button" class="btn" id="knowBtn">浜通りの知識を読み込む</button>
+    <button type="button" class="btn" id="forgetKnowBtn">知識を消す</button>
+    <input type="file" id="knowFile" accept=".md,.txt,text/plain,text/markdown" hidden>
+  </div>
+  <p class="know-note" id="knowNote"></p>
 </section>
 
 <!-- 5. 小テスト -->
@@ -821,11 +829,24 @@ body{
      先生は会話の流れを踏まえて答える。会話は残さない（長押し面を閉じたら消える）
      ===================================================== */
   var DIALOGS={};
+  /* 浜通りの知識（学習者が端末で読み込んだテキスト）。個人情報を含むので、アプリのファイルにも書き出しにも入れず、
+     この端末の localStorage にだけ置く。先生への質問のときだけ API に送る */
+  var KNOW='bunka:knowledge';
+  function knowledge(){ try{ return localStorage.getItem(KNOW)||''; }catch(e){ return ''; } }
+  var HAMADORI='\n【浜通りとの結びつけ方】\n'
+    +'下の「浜通りの知識」は、学習者（KANTAくん）の研究対象である福島県浜通り地域の背景知識。次の場合分けで使う。\n'
+    +'1. KANTAくんが浜通りとの関係を明示的に聞いたとき（「浜通りと繋げると？」「浜通りでいうと？」など）：必ず浜通りに結びつけて答える。'
+    +'知識の第0節「どう答えるか」に従い、場面→定義→浜通りでの現れ方→立つ問いの順で、町名で具体的に書く。この場合だけ300字以内でよい。'
+    +'ただし第0節の9の「末尾に掛け合いを一往復足す」はしない（チャット自体が掛け合いなので）。\n'
+    +'2. 聞かれていないが、その用語が文脈上無理なく浜通りに結びつくとき：ふつうに答えたあと、最後に「浜通りでいうと〜」を一文だけ添えてよい。毎回は添えない。'
+    +'結びつきが弱いときや、会話の流れが別の話題のときは添えない。\n'
+    +'3. 浜通りとの結びつきを聞かれたが、その用語が浜通りとほとんど関係しないとき：無理に結びつけず、「うーん、これは浜通りとは関係なく覚えてね」と言ってから、ふつうに答える。\n'
+    +'どの場合も、知識にない浜通りの事実は作らない。【要確認】の事項は確かでないと断る。数値には時点を付ける。「風評」「払拭」の語で浜通りを語らない。\n';
   var SENSEI='あなたは「Claude先生」。東京大学大学院（文化資源学）の入試に向けて学ぶ「KANTAくん」の質問に、LINE のチャットで答える。\n'
     +'KANTAくんは用語を字面で誤解したり、身近な例に引き寄せたり、ちょっとボケたりする。\n'
     +'答え方：\n'
     +'・まず誤解があれば、やさしく正す（「〜ではありません」「逆です」）。\n'
-    +'・すぐ核心を短く言う。2〜3文、全体で150字以内。です・ます調。前置きや見出し、箇条書き、記号での強調は使わない。\n'
+    +'・すぐ核心を短く言う。2〜3文、全体で150字以内（浜通りに結びつけて答えるときは下の決まりに従う）。です・ます調。前置きや見出し、箇条書き、記号での強調は使わない。\n'
     +'・年号や仕組み、具体例を一つ添えると覚えやすい。ボケには軽く乗ってから論点に戻す。\n'
     +'・下の用語カード（承認済み）の内容を前提にする。カードにない事実は確かなものだけを述べ、不確かなときはそう言う。\n'
     +'・入試の論述で使える観点（論点・使いどころ）につなげられるときはつなげる。\n';
@@ -861,7 +882,12 @@ body{
         msgs.push({ role:'user', content:q });
         busy=true; box.dataset.busy='1'; btn.disabled=true;
         var typing=add(bubble('t', '…', 'typing'));
-        var system=SENSEI+'\n【話し方の手本（別の語の掛け合い）】\n'+sampleDialogs(c.id)+'\n\n【用語カード】\n'+cardContext(c);
+        /* 変わらない部分（先生の決まり＋浜通りの知識）を先に置き、キャッシュの印を付ける。
+           語ごとに変わる部分（手本・用語カード）はその後ろ。知識が長いので、続けて聞くときの料金を抑えるため */
+        var know=knowledge(), tail='\n【話し方の手本（別の語の掛け合い）】\n'+sampleDialogs(c.id)+'\n\n【用語カード】\n'+cardContext(c);
+        var system=know
+          ? [{ type:'text', text:SENSEI+HAMADORI+'\n【浜通りの知識】\n'+know, cache_control:{ type:'ephemeral' } }, { type:'text', text:tail }]
+          : SENSEI+tail;
         callClaude(system, msgs.slice(-16)).then(function(text){
           typing.remove();
           text=text || '（答えが空でした）';
@@ -1264,7 +1290,31 @@ body{
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
   });
   $('importBtn').addEventListener('click', function(){ $('importFile').click(); });
-  function renderForgetKey(){ $('forgetKeyBtn').disabled=!apiKey(); }
+  function renderForgetKey(){
+    $('forgetKeyBtn').disabled=!apiKey();
+    var k=knowledge();
+    $('forgetKnowBtn').disabled=!k;
+    $('knowBtn').textContent=k ? '浜通りの知識を読み込み直す' : '浜通りの知識を読み込む';
+    $('knowNote').textContent=k ? '浜通りの知識：この端末に保存済み（'+Array.from(k).length.toLocaleString()+'字）。Claude先生に「浜通りと繋げると？」と聞けます。書き出しには含めません'
+      : '浜通りの知識は未読み込み。読み込んだファイルはこの端末にだけ保存し、書き出しには含めません';
+  }
+  $('knowBtn').addEventListener('click', function(){ $('knowFile').click(); });
+  $('knowFile').addEventListener('change', function(){
+    var f=this.files[0]; this.value='';
+    if(!f) return;
+    f.text().then(function(t){
+      t=t.replace(/^\uFEFF/, '').trim();
+      if(Array.from(t).length<200){ alert('中身が短すぎるようです。浜通りの知識のファイル（.md / .txt）を選んでください'); return; }
+      if(Array.from(t).length>120000){ alert('長すぎます（12万字まで）'); return; }
+      try{ localStorage.setItem(KNOW, t); }catch(e){ alert('この端末に保存できませんでした'); return; }
+      renderForgetKey();
+    });
+  });
+  $('forgetKnowBtn').addEventListener('click', function(){
+    if(!confirm('この端末に保存した浜通りの知識を消します')) return;
+    try{ localStorage.removeItem(KNOW); }catch(e){}
+    renderForgetKey();
+  });
   $('forgetKeyBtn').addEventListener('click', function(){
     if(!confirm('この端末に保存した API キーを消します')) return;
     try{ localStorage.removeItem(APIKEY); }catch(e){}
