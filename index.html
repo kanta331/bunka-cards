@@ -263,10 +263,32 @@ body{
 @keyframes cz-pop{ 0%{ transform:scale(.8) } 60%{ transform:scale(1.08) } 100%{ transform:none } }
 @keyframes cz-shake{ 0%,100%{ transform:none } 25%{ transform:translateX(-4px) } 75%{ transform:translateX(4px) } }
 .cz-chips{ width:min(100%,380px); display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:14px 0 6px; min-height:44px; }
-/* 選択肢は画面の下に留める（文章が長くても、穴と選択肢が同時に見える） */
-.cz-chips{ position:sticky; bottom:0; z-index:2; margin-bottom:0; padding:10px 0 calc(env(safe-area-inset-bottom,0px) + 8px);
-  background:linear-gradient(to bottom, rgba(0,0,0,0), var(--bg) 12px); }
-.cz-chips:empty{ position:static; padding:0; }
+/* 選択肢と回答ボタンは画面の下に留める（文章が長くても、穴と選択肢が同時に見える） */
+.cz-tray{ position:sticky; bottom:0; z-index:2; width:min(100%,380px); display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:10px 0 calc(env(safe-area-inset-bottom,0px) + 8px); background:linear-gradient(to bottom, rgba(0,0,0,0), var(--bg) 12px); }
+.cz-tray[hidden]{ display:none; }
+.cz-tray .cz-chips{ margin:0; }
+.cz-answer{ min-width:9em; }
+.cz-text{ position:relative; }
+.cz-text .sparks{ inset:0; }
+.hole.filled{ border:1.5px solid var(--frame); background:#fff; color:var(--ink); font-size:15px; min-width:0; cursor:pointer; }
+.hole.bad{ border:1.5px solid var(--red); background:#fbe7e4; color:#7a1f17; font-size:15px; font-weight:600; min-width:0; }
+.hole.ok.glow{ box-shadow:0 0 0 2px var(--gold), 0 0 14px 4px rgba(200,155,60,.55); }
+.cz-exp{ width:min(100%,380px); display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+.cz-exp[hidden]{ display:none; }
+.cz-exp .it{ background:var(--face); color:var(--ink); border:1px solid #e9b8b0; border-radius:12px; padding:11px 14px; font-size:13.5px; line-height:1.75; }
+.cz-exp .it h4{ margin:0 0 4px; font-size:14px; }
+.cz-exp .it h4 s{ color:#7a1f17; }
+.cz-exp .it p{ margin:4px 0 0; }
+.cz-exp .it b{ background:#fff3c4; font-weight:600; padding:0 2px; }
+.cz-exp .it small{ display:block; font-size:11.5px; color:var(--muted); margin-top:4px; }
+.cz-exp .ai{ align-self:center; }
+.cz-exp .ai-out{ background:var(--face); color:var(--ink); border-left:3px solid var(--frame); border-radius:8px; padding:10px 14px; font-size:14px; line-height:1.8; white-space:pre-wrap; }
+.cz-exp .ai-out:empty{ display:none; }
+.cz-exp .ai-out.wait{ color:var(--hint); }
+.cz-exp .ai-out.err{ color:var(--red); font-size:13px; border-left-color:var(--red); }
+.cz-done{ font-size:22px; font-family:var(--mincho); font-weight:600; color:var(--onbg); text-align:center; }
+@media (prefers-reduced-motion:no-preference){ .cz-done{ animation:cz-pop .5s ease-out; } }
 .chip{ appearance:none; font:inherit; font-size:14.5px; padding:8px 15px; border-radius:22px; border:1.5px solid var(--frame); background:var(--face); color:var(--ink);
   box-shadow:0 6px 14px -10px rgba(0,0,0,.5); cursor:grab; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
 .chip.sel{ background:var(--frame); color:#fff; }
@@ -483,8 +505,12 @@ body{
   <div class="q-dir">穴埋め</div>
   <div class="cz-term" id="czTerm"></div>
   <div class="cz-text" id="czText"></div>
-  <div class="cz-chips" id="czChips"></div>
+  <div class="cz-tray" id="czTray">
+    <div class="cz-chips" id="czChips"></div>
+    <button type="button" class="btn primary cz-answer" id="czAnswer" disabled>回答</button>
+  </div>
   <div class="cz-msg" id="czMsg" aria-live="polite"></div>
+  <div class="cz-exp" id="czExp" hidden></div>
   <div class="cz-end" id="czEnd" hidden>
     <button type="button" class="btn" id="czNext">もう1問</button>
     <button type="button" class="btn primary" id="czHome">ホームへ</button>
@@ -731,6 +757,8 @@ body{
       box.classList.toggle('nokey', off || !apiKey());
     }
     if($('esSend')) countEssay();
+    var za=document.getElementById('czAsk');
+    if(za && !za.dataset.busy){ za.disabled=off; za.textContent=off ? '圏外' : 'Claude でくわしく'; za.classList.toggle('nokey', off || !apiKey()); }
   }
   window.addEventListener('online', renderNet);
   window.addEventListener('offline', renderNet);
@@ -1299,14 +1327,14 @@ body{
         穴の候補は cloze.json（語ごとに確かめた、まとまりのある語句）。毎回ランダムに5つ選ぶ。
         説明文に2回以上出る語句は、片方が答えになってしまうので使わない。穴どうしは2字以上離す
      ===================================================== */
-  var CLOZE={}, CZ=null, CZ_N=5, CZ_DECOY=3;
+  var CLOZE={}, CZ=null, CZ_N=5, CZ_DECOY=5;
   /* 誤答：正解と同じ種類（年／カタカナ語／そのほか）で字数の近い語句を、つながり先の語の候補から選ぶ。
      足りなければ同じ出題区分の語から。この説明文に出てくる語句は、消去法ですぐ外せるので使わない */
   function czKind(t){ return /^\d{4}(年代)?$/.test(t) ? 'y' : /^[ァ-ヺー・＝]+$/.test(t) ? 'k' : 'o'; }
-  function decoys(c, answers){
+  function decoys(c, answers, src){
     var b=c.body, seen={}, near=[], far=[];
     answers.forEach(function(t){ seen[t]=1; });
-    function take(list, x){ (CLOZE[x.id]||[]).forEach(function(t){ if(!seen[t] && b.indexOf(t)<0){ seen[t]=1; list.push(t); } }); }
+    function take(list, x){ (CLOZE[x.id]||[]).forEach(function(t){ if(!seen[t] && b.indexOf(t)<0){ seen[t]=1; src[t]=x.id; list.push(t); } }); }
     (c.links||[]).forEach(function(l){ var x=BYID[resolve(l)]; if(x && x.id!==c.id) take(near, x); });
     shuffle(APPROVED.filter(function(x){ return x.id!==c.id && x.exam.kind===c.exam.kind; })).forEach(function(x){ take(far, x); });
     var pool=shuffle(near).concat(shuffle(far)), out=[];
@@ -1337,45 +1365,140 @@ body{
   function startCloze(){
     var pool=APPROVED.filter(function(c){ return (CLOZE[c.id]||[]).length>=CZ_N; });
     var c=pool[Math.floor(Math.random()*pool.length)], holes=pickHoles(c);
-    CZ={ c:c, holes:holes, left:holes.length, miss:0, sel:null };
+    CZ={ c:c, holes:holes, sel:null, src:{}, judged:false };
     $('czTerm').textContent=c.term;
     var b=c.body, h='', at=0;
     holes.forEach(function(p, i){
       h+=esc(b.slice(at, p.a))+'<span class="hole" data-k="'+i+'" role="button" tabindex="0" aria-label="穴'+(i+1)+'" style="min-width:'+Math.max(3.2, Array.from(p.t).length*.9+.6).toFixed(1)+'em">'+(i+1)+'</span>';
       at=p.z;
     });
-    $('czText').innerHTML=h+esc(b.slice(at));
+    $('czText').innerHTML=h+esc(b.slice(at))+'<div class="sparks"></div>';
     var answers=holes.map(function(p){ return p.t; });
-    $('czChips').innerHTML=shuffle(answers.concat(decoys(c, answers))).map(function(t){
-      return '<button type="button" class="chip">'+esc(t)+'</button>';
-    }).join('');
-    $('czMsg').textContent='指で穴へ運ぶ（タップ→穴タップでも可）。まちがいなしで2ポイント';
+    $('czChips').innerHTML=shuffle(answers.concat(decoys(c, answers, CZ.src))).map(chipHTML).join('');
+    $('czMsg').textContent='10の中から5つを穴へ運び、「回答」。5つとも正しければ2ポイント';
+    $('czTray').hidden=false; $('czExp').hidden=true; $('czExp').innerHTML='';
     $('czEnd').hidden=true;
+    updateAnswer();
     show('cloze');
     $('cloze').scrollTop=0;
   }
-  /* 置いてみる。同じ語句なら正解（同じ語句の選択肢が2つあっても、どちらでもよい） */
+  function chipHTML(t){ return '<button type="button" class="chip">'+esc(t)+'</button>'; }
+  function holeNo(k){ return '穴'+(k+1); }
+  /* 置く。その場では正誤を判定しない。すでに入っていた語は選択肢へ戻す */
   function tryPlace(chip, hole){
-    if(!CZ || !chip || !hole || hole.classList.contains('ok')) return;
-    var k=+hole.dataset.k;
-    if(chip.textContent===CZ.holes[k].t){
-      hole.textContent=CZ.holes[k].t; hole.classList.remove('ng','over','sel'); hole.classList.add('ok');
-      hole.removeAttribute('tabindex'); hole.setAttribute('aria-label', CZ.holes[k].t);
-      chip.remove(); CZ.left--; CZ.sel=null;
-      if(!CZ.left) finishCloze();
+    if(!CZ || CZ.judged || !chip || !hole) return;
+    if(hole.dataset.v) $('czChips').insertAdjacentHTML('beforeend', chipHTML(hole.dataset.v));
+    hole.dataset.v=chip.textContent;
+    hole.textContent=chip.textContent;
+    hole.classList.remove('over','sel'); hole.classList.add('filled');
+    hole.setAttribute('aria-label', holeNo(+hole.dataset.k)+'：'+chip.textContent+'（タップで戻す）');
+    chip.remove(); CZ.sel=null;
+    updateAnswer();
+  }
+  /* 穴に入れた語を選択肢へ戻す */
+  function takeBack(hole){
+    if(!CZ || CZ.judged || !hole.dataset.v) return;
+    $('czChips').insertAdjacentHTML('beforeend', chipHTML(hole.dataset.v));
+    delete hole.dataset.v;
+    var k=+hole.dataset.k; hole.textContent=k+1; hole.classList.remove('filled'); hole.setAttribute('aria-label', holeNo(k));
+    updateAnswer();
+  }
+  function updateAnswer(){
+    var n=document.querySelectorAll('#czText .hole.filled').length;
+    $('czAnswer').disabled=!CZ || CZ.judged || n<CZ.holes.length;
+    $('czAnswer').textContent=n<(CZ ? CZ.holes.length : 5) ? '回答（あと'+((CZ ? CZ.holes.length : 5)-n)+'つ）' : '回答';
+  }
+
+  /* 回答：5つとも正しければ2ポイントと正解の演出。誤答があれば0ポイントで、誤答ごとの解説 */
+  $('czAnswer').addEventListener('click', function(){
+    if(!CZ || CZ.judged) return;
+    CZ.judged=true; clearSel();
+    var wrong=[];
+    document.querySelectorAll('#czText .hole').forEach(function(h){
+      var k=+h.dataset.k, v=h.dataset.v, t=CZ.holes[k].t;
+      h.classList.remove('filled');
+      if(v===t){ h.classList.add('ok'); }
+      else{ wrong.push({ k:k, v:v, t:t }); h.textContent=t; h.classList.add('bad'); h.setAttribute('aria-label', holeNo(k)+'：正解は'+t+'（入れたのは'+v+'）'); }
+    });
+    $('czTray').hidden=true;
+    if(!wrong.length){
+      S.points+=2; save();
+      $('czMsg').innerHTML='<div class="cz-done">全問正解</div>+2 ポイント';
+      var sp=$('czText').querySelector('.sparks');
+      document.querySelectorAll('#czText .hole.ok').forEach(function(h, i){
+        setTimeout(function(){ h.classList.add('glow'); for(var j=0;j<8;j++) spawnSpark(sp, 1); }, 120+i*160);
+      });
     }else{
-      CZ.miss++;
-      hole.classList.remove('ng'); void hole.offsetWidth; hole.classList.add('ng');
-      $('czMsg').textContent='ちがう穴のようです';
+      $('czMsg').textContent='誤答 '+wrong.length+'つ　ポイントなし';
+      explain(wrong);
     }
-  }
-  /* まちがいなしで5つ埋めたら2ポイント。1回でもちがう穴に置いたら0 */
-  function finishCloze(){
-    var pts=CZ.miss ? 0 : 2;
-    S.points+=pts; save();
-    $('czMsg').textContent=CZ.miss ? 'できあがり（まちがい '+CZ.miss+'回）　ポイントなし' : 'できあがり（まちがいなし）　+2 ポイント';
     $('czEnd').hidden=false;
+  });
+
+  /* 説明文を文に分け、位置 pos を含む文を返す */
+  function sentenceAt(text, pos){
+    var a=text.lastIndexOf('。', pos-1)+1, z=text.indexOf('。', pos);
+    return text.slice(a, z<0 ? text.length : z+1);
   }
+  function mark(sent, word){
+    var i=sent.indexOf(word);
+    return i<0 ? esc(sent) : esc(sent.slice(0, i))+'<b>'+esc(word)+'</b>'+esc(sent.slice(i+word.length));
+  }
+  /* 解説A：カードのデータだけで、正しい語の入る文と、入れた語がどこの語かを示す */
+  function explain(wrong){
+    var c=CZ.c, html='';
+    wrong.forEach(function(w){
+      var p=CZ.holes[w.k], other=CZ.holes.findIndex(function(h){ return h.t===w.v; });
+      html+='<div class="it"><h4>'+holeNo(w.k)+'：<s>'+esc(w.v)+'</s> → 「'+esc(w.t)+'」</h4>'
+        +'<p>'+mark(sentenceAt(c.body, p.a), w.t)+'</p>';
+      if(other>=0){
+        var so=sentenceAt(c.body, CZ.holes[other].a);
+        html+='<p>「'+esc(w.v)+'」は'+holeNo(other)+'に入る語。</p>'+(so===sentenceAt(c.body, p.a) ? '' : '<small>'+mark(so, w.v)+'</small>');
+      }else{
+        var x=BYID[CZ.src[w.v]];
+        if(x){
+          var i=x.body.indexOf(w.v);
+          html+='<p>「'+esc(w.v)+'」は《'+esc(x.term)+'》の説明に出てくる語。</p><small>'+mark(sentenceAt(x.body, i<0 ? 0 : i), w.v)+'</small>';
+        }
+      }
+      html+='</div>';
+    });
+    html+='<button type="button" class="btn ai" id="czAsk">Claude でくわしく</button><div class="ai-out" id="czAskOut" aria-live="polite"></div>';
+    $('czExp').innerHTML=html; $('czExp').hidden=false;
+    CZ.wrong=wrong;
+    renderNet();
+  }
+
+  /* 解説B：Claude に、誤答ごとに「なぜその語ではないか」を書かせる。カードの承認済みデータだけを前提にする */
+  $('czExp').addEventListener('click', function(e){
+    if(!e.target.closest('#czAsk') || !CZ || !CZ.wrong || !online()) return;
+    var btn=$('czAsk'), out=$('czAskOut'), cur=CZ;
+    (apiKey() ? Promise.resolve(true) : askKey()).then(function(ok){
+      renderNet();
+      if(!ok || cur!==CZ) return;
+      btn.disabled=true; btn.dataset.busy='1'; out.className='ai-out wait'; out.textContent='考え中…';
+      var srcIds={};
+      cur.wrong.forEach(function(w){ if(cur.src[w.v]) srcIds[cur.src[w.v]]=1; });
+      var system='あなたは東京大学大学院（文化資源学）の入試に向けて学ぶ人を手伝う。'
+        +'穴埋め問題で、学習者が穴に入れた語のうちまちがえたものについて、なぜその語ではなく正解の語が入るのかを、誤答ごとに日本語で短く説明する。'
+        +'全体で350字以内。前置きや見出しは付けず、「穴1：」のように穴の番号から書き始める。'
+        +'下の用語カード（承認済み）の内容だけを根拠にし、カードにない事実を足さない。\n\n'
+        +'【問題のカード】\n'+cardContext(cur.c)
+        +Object.keys(srcIds).map(function(id){ return '\n\n【誤答の語が出てくるカード】\n'+cardContext(BYID[id]); }).join('');
+      var user='穴の空いた文章は【問題のカード】の説明文。まちがえた穴：\n'
+        +cur.wrong.map(function(w){ return holeNo(w.k)+'：入れた語「'+w.v+'」、正解「'+w.t+'」'; }).join('\n');
+      callClaude(system, user).then(function(text){
+        if(cur!==CZ) return;
+        out.className='ai-out'; out.textContent=text || '（答えが空でした）';
+      }, function(err){
+        if(cur!==CZ) return;
+        out.className='ai-out err';
+        out.textContent=err.status==='refusal' ? err.message : err.status===401 ? '鍵が正しくないようです。コレクション画面の「鍵を消す」から入れ直してください。'
+          : err.status ? 'うまく返りませんでした（'+err.status+'：'+err.message+'）' : '通信できませんでした';
+        delete btn.dataset.busy; btn.disabled=false;
+      });
+    });
+  });
   function clearSel(){
     document.querySelectorAll('#cloze .sel').forEach(function(x){ x.classList.remove('sel'); });
     if(CZ) CZ.sel=null;
@@ -1384,7 +1507,7 @@ body{
   /* 指で運ぶ。少し動いたらドラッグ、動かずに離したらタップ（選ぶ） */
   (function(){
     var drag=null;
-    function holeAt(x, y){ var el=document.elementFromPoint(x, y); return el && el.closest('#czText .hole:not(.ok)'); }
+    function holeAt(x, y){ var el=document.elementFromPoint(x, y); return el && !(CZ && CZ.judged) && el.closest('#czText .hole'); }
     $('czChips').addEventListener('pointerdown', function(e){
       var chip=e.target.closest('.chip'); if(!chip) return;
       drag={ chip:chip, x0:e.clientX, y0:e.clientY, ghost:null, over:null, id:e.pointerId };
@@ -1426,10 +1549,12 @@ body{
       if(!was){ chip.classList.add('sel'); CZ.sel=chip; }
     });
   })();
+  /* 穴のタップ：選んだ選択肢があれば入れる（入っていれば入れ替え）、なければ入っている語を戻す */
   function holeTap(e){
-    var h=e.target.closest('.hole:not(.ok)'); if(!h || !CZ || !CZ.sel) return;
+    var h=e.target.closest('.hole'); if(!h || !CZ || CZ.judged) return;
     if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
-    e.preventDefault(); tryPlace(CZ.sel, h);
+    e.preventDefault();
+    if(CZ.sel) tryPlace(CZ.sel, h); else takeBack(h);
   }
   $('czText').addEventListener('click', holeTap);
   $('czText').addEventListener('keydown', holeTap);
