@@ -246,6 +246,36 @@ body{
 .home-status small{ display:block; font-size:12px; color:var(--onbg2); }
 .home-quiz{ margin-top:14px; }
 .home-btns{ display:flex; gap:10px; justify-content:center; }
+.home-btns .btn{ padding:11px 20px; }
+
+/* 穴埋め */
+#cloze{ justify-content:flex-start; overflow-y:auto; padding-top:calc(env(safe-area-inset-top,0px) + 56px); }
+/* 縦にあふれたら縮めずにスクロールさせる */
+#cloze > *, #essay > *{ flex-shrink:0; }
+.cz-term{ font-family:var(--mincho); font-weight:600; font-size:clamp(20px, 7vw, 28px); text-align:center; margin:8px 0 12px; text-wrap:balance; word-break:keep-all; overflow-wrap:anywhere; }
+.cz-text{ width:min(100%,380px); background:var(--face); color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px 15px; font-size:15px; line-height:1.95; text-align:left; }
+.hole{ display:inline-block; min-width:3.2em; height:1.55em; line-height:1.5em; vertical-align:-.28em; margin:0 2px; padding:0 4px; border-radius:6px;
+  border:1.5px dashed var(--frame); background:#eef3fa; text-align:center; color:var(--frame2); font-size:12px; transition:background .15s, border-color .15s; }
+.hole.over{ background:#dbe6f5; border-style:solid; }
+.hole.sel{ box-shadow:0 0 0 2px var(--gold); }
+.hole.ok{ border:0; background:#fff3c4; color:var(--ink); font-size:15px; font-weight:600; min-width:0; animation:cz-pop .35s ease-out; }
+.hole.ng{ animation:cz-shake .35s; border-color:var(--red); background:#fbe7e4; }
+@keyframes cz-pop{ 0%{ transform:scale(.8) } 60%{ transform:scale(1.08) } 100%{ transform:none } }
+@keyframes cz-shake{ 0%,100%{ transform:none } 25%{ transform:translateX(-4px) } 75%{ transform:translateX(4px) } }
+.cz-chips{ width:min(100%,380px); display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:14px 0 6px; min-height:44px; }
+/* 選択肢は画面の下に留める（文章が長くても、穴と選択肢が同時に見える） */
+.cz-chips{ position:sticky; bottom:0; z-index:2; margin-bottom:0; padding:10px 0 calc(env(safe-area-inset-bottom,0px) + 8px);
+  background:linear-gradient(to bottom, rgba(0,0,0,0), var(--bg) 12px); }
+.cz-chips:empty{ position:static; padding:0; }
+.chip{ appearance:none; font:inherit; font-size:14.5px; padding:8px 15px; border-radius:22px; border:1.5px solid var(--frame); background:var(--face); color:var(--ink);
+  box-shadow:0 6px 14px -10px rgba(0,0,0,.5); cursor:grab; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.chip.sel{ background:var(--frame); color:#fff; }
+.chip.lift{ opacity:.25; }
+.chip:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+.chip-ghost{ position:fixed; z-index:30; pointer-events:none; transform:translate(-50%,-60%) scale(1.08); background:var(--frame); color:#fff; border-color:var(--frame); box-shadow:0 14px 26px -10px rgba(0,0,0,.6); }
+.cz-msg{ min-height:22px; font-size:13px; color:var(--onbg2); text-align:center; margin-top:4px; }
+.cz-end{ display:flex; gap:10px; justify-content:center; margin:14px 0 10px; }
+.cz-end[hidden]{ display:none; }
 .btn.nokey{ color:var(--hint); background:var(--face2); border-style:dashed; }
 
 /* 記述練習 */
@@ -373,9 +403,9 @@ body{
 
 /* 小テスト（bunka） */
 .q-word.term{ font-family:var(--mincho); font-weight:600; font-size:clamp(22px, 8vw, 34px); line-height:1.3; max-width:12em; text-wrap:balance; }
-.q-word.usage{ font-size:17px; line-height:1.8; max-width:20em; }
+.q-word.desc{ font-size:16px; line-height:1.8; max-width:21em; text-align:left; }
 .q-opts .btn.term{ font-family:var(--mincho); font-weight:600; font-size:17px; }
-.q-opts .btn.usage{ font-size:14px; }
+.q-opts .btn.desc{ font-size:13.5px; line-height:1.6; padding:11px 16px; }
 </style>
 </head>
 <body>
@@ -394,6 +424,7 @@ body{
   <div class="home-status" id="homeStatus"></div>
   <div class="home-btns home-quiz">
     <button type="button" class="btn" id="quizBtn">小テスト</button>
+    <button type="button" class="btn" id="clozeBtn">穴埋め</button>
     <button type="button" class="btn" id="essayBtn">記述</button>
   </div>
   <div class="home-foot"><button type="button" class="link" id="collBtn"></button></div>
@@ -445,6 +476,20 @@ body{
   <div class="q-plus" id="qPlus">+1 ポイント</div>
 </section>
 <div class="q-show" id="qShow"><div class="stage" id="qShowStage"></div><div class="cap">正解</div></div>
+
+<!-- 7. 穴埋め -->
+<section class="screen" id="cloze">
+  <button type="button" class="x" id="clozeClose" aria-label="やめる">×</button>
+  <div class="q-dir">穴埋め</div>
+  <div class="cz-term" id="czTerm"></div>
+  <div class="cz-text" id="czText"></div>
+  <div class="cz-chips" id="czChips"></div>
+  <div class="cz-msg" id="czMsg" aria-live="polite"></div>
+  <div class="cz-end" id="czEnd" hidden>
+    <button type="button" class="btn" id="czNext">もう1問</button>
+    <button type="button" class="btn primary" id="czHome">ホームへ</button>
+  </div>
+</section>
 
 <!-- 6. 記述練習 -->
 <section class="screen" id="essay">
@@ -899,7 +944,7 @@ body{
   /* =====================================================
      画面切り替え
      ===================================================== */
-  var screens=['home','open','result','viewer','collection','quiz','quizEnd','essay'];
+  var screens=['home','open','result','viewer','collection','quiz','quizEnd','essay','cloze'];
   var current=null, homeTimer=0;
   function show(name){
     screens.forEach(function(s){ document.getElementById(s).classList.toggle('on', s===name); });
@@ -1161,10 +1206,29 @@ body{
   });
 
   /* =====================================================
-     5. 小テスト：124語からランダム5問。用語→使いどころ と 使いどころ→用語 を交互に
+     5. 小テスト：124語からランダム5問。用語→説明 と 説明→用語 を交互に
+     「説明」は説明全文の冒頭からの抜粋（改変しない）。
      誤答の選択肢は正解のつながり先から優先して引き、足りなければ同じ出題区分から補う
      ===================================================== */
   var Q=null;
+
+  /* 説明全文の冒頭の抜粋。1文目を使い、短すぎれば次の文をつなぐ。
+     用語そのものを含む文は答えが見えるので飛ばす。長ければ読点で切って「…」 */
+  var EXCERPT_SKIP={ 'IIIF':1 };   /* 1文目が英語の正式名だけの語は2文目から */
+  var EXCERPT_MIN=20, EXCERPT_MAX=80, EXC={};
+  function excerpt(c){
+    if(EXC[c.id]) return EXC[c.id];
+    var ss=c.body.split('。').filter(Boolean).map(function(x){ return x+'。'; });
+    var core=c.term.replace(/（.*?）/g,''), i=EXCERPT_SKIP[c.id]||0;
+    while(i<ss.length-1 && (ss[i].indexOf(c.term)>=0 || ss[i].indexOf(core)>=0)) i++;
+    var t=ss[i];
+    while(t.length<EXCERPT_MIN && i+1<ss.length) t+=ss[++i];
+    if(t.length>EXCERPT_MAX){
+      var cut=t.lastIndexOf('、', EXCERPT_MAX);
+      t=t.slice(0, cut>EXCERPT_MIN ? cut : EXCERPT_MAX)+'…';
+    }
+    return (EXC[c.id]=t);
+  }
   function startQuiz(){
     var today=dayKey();
     Object.keys(S.quizLog).forEach(function(id){ if(S.quizLog[id]!==today) delete S.quizLog[id]; });
@@ -1177,7 +1241,7 @@ body{
   function distractors(c){
     var picked={}, out=[];
     function add(x){
-      if(out.length>=3 || !x || x.id===c.id || picked[x.id] || x.usage===c.usage || x.term===c.term) return;
+      if(out.length>=3 || !x || x.id===c.id || picked[x.id] || excerpt(x)===excerpt(c) || x.term===c.term) return;
       picked[x.id]=1; out.push(x);
     }
     shuffle(c.links||[]).forEach(function(l){ add(BYID[resolve(l)]); });
@@ -1186,14 +1250,14 @@ body{
     return out;
   }
   function renderQ(){
-    var c=Q.items[Q.i], toUsage=Q.i%2===0;
+    var c=Q.items[Q.i], toDesc=Q.i%2===0;
     S.quizLog[c.id]=dayKey(); save();
     $('qN').textContent=(Q.i+1)+' / '+Q.items.length;
-    $('qDir').textContent=toUsage ? '用語 → 使いどころ' : '使いどころ → 用語';
-    var qw=$('qWord'); qw.className='q-word '+(toUsage ? 'term' : 'usage'); qw.textContent=toUsage ? c.term : c.usage;
+    $('qDir').textContent=toDesc ? '用語 → 説明' : '説明 → 用語';
+    var qw=$('qWord'); qw.className='q-word '+(toDesc ? 'term' : 'desc'); qw.textContent=toDesc ? c.term : excerpt(c);
     var opts=shuffle([c].concat(distractors(c)));
     $('qOpts').innerHTML=opts.map(function(x){
-      return '<button type="button" class="btn '+(toUsage ? 'usage' : 'term')+'" data-id="'+esc(x.id)+'">'+esc(toUsage ? x.usage : x.term)+'</button>';
+      return '<button type="button" class="btn '+(toDesc ? 'desc' : 'term')+'" data-id="'+esc(x.id)+'">'+esc(toDesc ? excerpt(x) : x.term)+'</button>';
     }).join('');
     $('qPlus').classList.remove('on');
     Q.busy=false;
@@ -1229,6 +1293,150 @@ body{
     show('quizEnd');
   }
   $('quizBtn').addEventListener('click', startQuiz);
+
+  /* =====================================================
+     7. 穴埋め：説明全文から5か所を抜き、下の選択肢を指で穴へ運ぶ
+        穴の候補は cloze.json（語ごとに確かめた、まとまりのある語句）。毎回ランダムに5つ選ぶ。
+        説明文に2回以上出る語句は、片方が答えになってしまうので使わない。穴どうしは2字以上離す
+     ===================================================== */
+  var CLOZE={}, CZ=null, CZ_N=5, CZ_DECOY=3;
+  /* 誤答：正解と同じ種類（年／カタカナ語／そのほか）で字数の近い語句を、つながり先の語の候補から選ぶ。
+     足りなければ同じ出題区分の語から。この説明文に出てくる語句は、消去法ですぐ外せるので使わない */
+  function czKind(t){ return /^\d{4}(年代)?$/.test(t) ? 'y' : /^[ァ-ヺー・＝]+$/.test(t) ? 'k' : 'o'; }
+  function decoys(c, answers){
+    var b=c.body, seen={}, near=[], far=[];
+    answers.forEach(function(t){ seen[t]=1; });
+    function take(list, x){ (CLOZE[x.id]||[]).forEach(function(t){ if(!seen[t] && b.indexOf(t)<0){ seen[t]=1; list.push(t); } }); }
+    (c.links||[]).forEach(function(l){ var x=BYID[resolve(l)]; if(x && x.id!==c.id) take(near, x); });
+    shuffle(APPROVED.filter(function(x){ return x.id!==c.id && x.exam.kind===c.exam.kind; })).forEach(function(x){ take(far, x); });
+    var pool=shuffle(near).concat(shuffle(far)), out=[];
+    shuffle(answers).forEach(function(a){
+      if(out.length>=CZ_DECOY) return;
+      var n=Array.from(a).length, k=czKind(a), i=-1;
+      for(var tol=1; tol<=6 && i<0; tol++){
+        i=pool.findIndex(function(t){ return czKind(t)===k && Math.abs(Array.from(t).length-n)<=tol; });
+      }
+      if(i<0) i=pool.findIndex(function(t){ return czKind(t)===k; });
+      if(i<0) i=0;
+      if(pool[i]){ out.push(pool[i]); pool.splice(i, 1); }
+    });
+    return out;
+  }
+  function pickHoles(c){
+    var b=c.body, cand=shuffle((CLOZE[c.id]||[]).filter(function(t){
+      var i=b.indexOf(t); return i>=0 && b.indexOf(t, i+1)<0;
+    })), picked=[];
+    cand.forEach(function(t){
+      if(picked.length>=CZ_N) return;
+      var a=b.indexOf(t), z=a+t.length;
+      if(picked.some(function(p){ return a<p.z+2 && p.a<z+2; })) return;
+      picked.push({ a:a, z:z, t:t });
+    });
+    return picked.sort(function(x, y){ return x.a-y.a; });
+  }
+  function startCloze(){
+    var pool=APPROVED.filter(function(c){ return (CLOZE[c.id]||[]).length>=CZ_N; });
+    var c=pool[Math.floor(Math.random()*pool.length)], holes=pickHoles(c);
+    CZ={ c:c, holes:holes, left:holes.length, miss:0, sel:null };
+    $('czTerm').textContent=c.term;
+    var b=c.body, h='', at=0;
+    holes.forEach(function(p, i){
+      h+=esc(b.slice(at, p.a))+'<span class="hole" data-k="'+i+'" role="button" tabindex="0" aria-label="穴'+(i+1)+'" style="min-width:'+Math.max(3.2, Array.from(p.t).length*.9+.6).toFixed(1)+'em">'+(i+1)+'</span>';
+      at=p.z;
+    });
+    $('czText').innerHTML=h+esc(b.slice(at));
+    var answers=holes.map(function(p){ return p.t; });
+    $('czChips').innerHTML=shuffle(answers.concat(decoys(c, answers))).map(function(t){
+      return '<button type="button" class="chip">'+esc(t)+'</button>';
+    }).join('');
+    $('czMsg').textContent='指で穴へ運ぶ（タップ→穴タップでも可）。まちがいなしで2ポイント';
+    $('czEnd').hidden=true;
+    show('cloze');
+    $('cloze').scrollTop=0;
+  }
+  /* 置いてみる。同じ語句なら正解（同じ語句の選択肢が2つあっても、どちらでもよい） */
+  function tryPlace(chip, hole){
+    if(!CZ || !chip || !hole || hole.classList.contains('ok')) return;
+    var k=+hole.dataset.k;
+    if(chip.textContent===CZ.holes[k].t){
+      hole.textContent=CZ.holes[k].t; hole.classList.remove('ng','over','sel'); hole.classList.add('ok');
+      hole.removeAttribute('tabindex'); hole.setAttribute('aria-label', CZ.holes[k].t);
+      chip.remove(); CZ.left--; CZ.sel=null;
+      if(!CZ.left) finishCloze();
+    }else{
+      CZ.miss++;
+      hole.classList.remove('ng'); void hole.offsetWidth; hole.classList.add('ng');
+      $('czMsg').textContent='ちがう穴のようです';
+    }
+  }
+  /* まちがいなしで5つ埋めたら2ポイント。1回でもちがう穴に置いたら0 */
+  function finishCloze(){
+    var pts=CZ.miss ? 0 : 2;
+    S.points+=pts; save();
+    $('czMsg').textContent=CZ.miss ? 'できあがり（まちがい '+CZ.miss+'回）　ポイントなし' : 'できあがり（まちがいなし）　+2 ポイント';
+    $('czEnd').hidden=false;
+  }
+  function clearSel(){
+    document.querySelectorAll('#cloze .sel').forEach(function(x){ x.classList.remove('sel'); });
+    if(CZ) CZ.sel=null;
+  }
+
+  /* 指で運ぶ。少し動いたらドラッグ、動かずに離したらタップ（選ぶ） */
+  (function(){
+    var drag=null;
+    function holeAt(x, y){ var el=document.elementFromPoint(x, y); return el && el.closest('#czText .hole:not(.ok)'); }
+    $('czChips').addEventListener('pointerdown', function(e){
+      var chip=e.target.closest('.chip'); if(!chip) return;
+      drag={ chip:chip, x0:e.clientX, y0:e.clientY, ghost:null, over:null, id:e.pointerId };
+      try{ chip.setPointerCapture(e.pointerId); }catch(err){}
+    });
+    $('czChips').addEventListener('pointermove', function(e){
+      if(!drag || e.pointerId!==drag.id) return;
+      if(!drag.ghost){
+        if(Math.hypot(e.clientX-drag.x0, e.clientY-drag.y0)<8) return;
+        clearSel();
+        var g=drag.chip.cloneNode(true); g.classList.add('chip-ghost'); document.body.appendChild(g);
+        drag.ghost=g; drag.chip.classList.add('lift');
+      }
+      drag.ghost.style.left=e.clientX+'px'; drag.ghost.style.top=e.clientY+'px';
+      /* 画面の上端に近づいたら文章をスクロールして、上の穴へも運べるように */
+      var sc=$('cloze'); if(e.clientY<90) sc.scrollTop-=10; else if(e.clientY>innerHeight-40) sc.scrollTop+=10;
+      var h=holeAt(e.clientX, e.clientY);
+      if(h!==drag.over){ if(drag.over) drag.over.classList.remove('over'); if(h) h.classList.add('over'); drag.over=h; }
+      e.preventDefault();
+    });
+    function end(e){
+      if(!drag || e.pointerId!==drag.id) return;
+      var d=drag; drag=null;
+      if(d.over) d.over.classList.remove('over');
+      if(d.ghost){
+        d.ghost.remove(); d.chip.classList.remove('lift');
+        if(e.type==='pointerup') tryPlace(d.chip, holeAt(e.clientX, e.clientY));
+      }else if(e.type==='pointerup'){
+        var was=d.chip.classList.contains('sel'); clearSel();
+        if(!was){ d.chip.classList.add('sel'); CZ.sel=d.chip; }
+      }
+    }
+    $('czChips').addEventListener('pointerup', end);
+    $('czChips').addEventListener('pointercancel', end);
+    /* キーボード：Enter で選ぶ */
+    $('czChips').addEventListener('keydown', function(e){
+      var chip=e.target.closest('.chip'); if(!chip || (e.key!=='Enter' && e.key!==' ')) return;
+      e.preventDefault(); var was=chip.classList.contains('sel'); clearSel();
+      if(!was){ chip.classList.add('sel'); CZ.sel=chip; }
+    });
+  })();
+  function holeTap(e){
+    var h=e.target.closest('.hole:not(.ok)'); if(!h || !CZ || !CZ.sel) return;
+    if(e.type==='keydown' && e.key!=='Enter' && e.key!==' ') return;
+    e.preventDefault(); tryPlace(CZ.sel, h);
+  }
+  $('czText').addEventListener('click', holeTap);
+  $('czText').addEventListener('keydown', holeTap);
+  $('clozeBtn').addEventListener('click', startCloze);
+  $('czNext').addEventListener('click', startCloze);
+  $('czHome').addEventListener('click', function(){ CZ=null; show('home'); });
+  $('clozeClose').addEventListener('click', function(){ CZ=null; show('home'); });
 
   /* =====================================================
      6. 記述練習：124語からランダムに1語、300字で説明 → 3観点の指摘と「次に足すなら」
@@ -1365,9 +1573,10 @@ body{
   S=load();
   Promise.all([
     fetch('cards.json').then(function(r){ return r.json(); }),
-    fetch('aliases.json').then(function(r){ return r.json(); })
+    fetch('aliases.json').then(function(r){ return r.json(); }),
+    fetch('cloze.json').then(function(r){ return r.json(); }).catch(function(){ return {}; })
   ]).then(function(res){
-    CARDS=res[0]; ALIASES=res[1];
+    CARDS=res[0]; ALIASES=res[1]; CLOZE=res[2]||{};
     CARDS.forEach(function(c){ BYID[c.id]=c; });
     buildNeighbors();
     APPROVED=CARDS.filter(function(c){ return c.status==='approved'; });
