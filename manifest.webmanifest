@@ -1,6 +1,6 @@
 {
-  "name": "用語確認",
-  "short_name": "用語確認",
+  "name": "Pocket用語カード",
+  "short_name": "Pocket用語カード",
   "description": "文化資源学の用語カード（124語）",
   "lang": "ja",
   "start_url": "./",
